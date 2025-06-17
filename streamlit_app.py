@@ -8,7 +8,9 @@ from datetime import datetime
 # --- Sidebar Configuration ---
 st.sidebar.title("Configuration")
 logo_file = st.sidebar.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"])
-page_title = st.sidebar.text_input("Webpage Title", "Air Carolinas Data Analysis")
+# Title and project input
+project_title = st.text_input("Enter Project Title", "HVAC Diagnostic Report")
+st.title(project_title)
 
 # --- Display Logo and Title ---
 if logo_file:
