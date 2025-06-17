@@ -22,6 +22,12 @@ def analyze_hvac_data(data, headers, page_title):
 
 # --- File Upload ---
 uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+if uploaded_file:
+    content = uploaded_file.read().decode("utf-8")
+    df = pd.read_csv(StringIO(content))
+    headers = df.columns.tolist()
+    mapping = parse_headers(headers)
+    issues = analyze_hvac_data(df, headers, page_title)
 
 # --- Helper Functions ---
 def parse_headers(headers):
@@ -149,13 +155,6 @@ def analyze_hvac_data(data, headers):
     return issues
 
 # --- Main App Logic ---
-if uploaded_file:
-    content = uploaded_file.read().decode("utf-8")
-    df = pd.read_csv(StringIO(content))
-    headers = df.columns.tolist()
-    mapping = parse_headers(headers)
-    issues = analyze_hvac_data(df, headers)
-
     st.subheader("Data Preview")
     st.dataframe(df.head(10))
 
