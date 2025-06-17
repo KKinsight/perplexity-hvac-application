@@ -71,7 +71,7 @@ def analyze_data(data, headers):
                 "suggestions": ["Remove duplicate rows.", "Check for repeated data uploads."]
             })
 
-    # Statistical outliers
+    # Statistical outliers summarized
     for colIdx, header in enumerate(headers):
         col_data = pd.to_numeric(data.iloc[:, colIdx], errors='coerce')
         nums = col_data.dropna()
@@ -81,14 +81,16 @@ def analyze_data(data, headers):
             iqr = q3 - q1
             lower = q1 - 1.5 * iqr
             upper = q3 + 1.5 * iqr
-            for i, num in enumerate(nums):
-                if num < lower or num > upper:
-                    issues.append({
-                        "severity": "medium",
-                        "message": f"Statistical outlier in \"{header}\": {num}",
-                        "explanation": "Outliers may indicate faulty sensors or abnormal operating conditions.",
-                        "suggestions": ["Inspect sensor calibration.", "Review abnormal events.", "Filter outliers for trend analysis."]
-                    })
+            outliers = nums[(nums < lower) | (nums > upper)]
+            if not outliers.empty:
+                issues.append({
+                    "severity": "medium",
+                    "message": f"Statistical outliers detected in \"{header}\"",
+                    "explanation": "Outliers may indicate faulty sensors or abnormal operating conditions.",
+                    "suggestions": ["Inspect sensor calibration.", "Review abnormal events.", "Filter outliers for trend analysis."],
+                    "outlier_count": len(outliers),
+                    "outlier_range": (outliers.min(), outliers.max())
+                })
 
     return issues
 
@@ -115,6 +117,9 @@ if uploaded_file:
         st.markdown("**Suggestions:**")
         for s in issue['suggestions']:
             st.markdown(f"- {s}")
+        if "outlier_count" in issue:
+            st.markdown(f"**Outlier Count:** {issue['outlier_count']}")
+            st.markdown(f"**Outlier Range:** {issue['outlier_range'][0]} to {issue['outlier_range'][1]}")
         st.markdown("---")
 
     # Time-series plot
@@ -146,6 +151,10 @@ if uploaded_file:
         report += f"Severity: {issue['severity']}\n"
         report += f"Issue: {issue['message']}\n"
         report += f"Explanation: {issue['explanation']}\n"
-        report += f"Suggestions: {'; '.join(issue['suggestions'])}\n\n"
+        report += f"Suggestions: {'; '.join(issue['suggestions'])}\n"
+        if "outlier_count" in issue:
+            report += f"Outlier Count: {issue['outlier_count']}\n"
+            report += f"Outlier Range: {issue['outlier_range'][0]} to {issue['outlier_range'][1]}\n"
+        report += "\n"
 
     st.download_button("Download Diagnostics Report", report, file_name="diagnostics_report.txt")
