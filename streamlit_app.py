@@ -5,14 +5,14 @@ import matplotlib.pyplot as plt
 from io import StringIO
 from datetime import datetime
 
+# --- Sidebar Configuration ---
+st.sidebar.title("Configuration")
+logo_file = st.sidebar.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"])
 
 # --- Display Logo and Title ---
 if logo_file:
     st.image(logo_file, width=200)
 
-# --- Sidebar Configuration ---
-st.sidebar.title("Configuration")
-logo_file = st.sidebar.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"])
 # Title and project input
 project_title = st.text_input("Enter Project Title", "HVAC Diagnostic Report")
 st.title(project_title)
