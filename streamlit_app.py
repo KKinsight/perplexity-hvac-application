@@ -1,25 +1,24 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from io import StringIO
 from datetime import datetime
-from PIL import Image
 
-# Load logo
-logo_path = "carolinas AIR"
-try:
-    logo = Image.open(logo_path)
-    st.image(logo, width=200)
-except:
-    st.warning("Logo could not be loaded.")
+# --- Sidebar Configuration ---
+st.sidebar.title("Configuration")
+logo_file = st.sidebar.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"])
+page_title = st.sidebar.text_input("Webpage Title", "Air Carolinas Data Analysis")
 
-# Custom page title
-page_title = st.text_input("Enter Webpage Title", "Air Carolinas Data Analysis")
+# --- Display Logo and Title ---
+if logo_file:
+    st.image(logo_file, width=200)
 st.title(page_title)
 
-# Helper functions
+# --- File Upload ---
+uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+
+# --- Helper Functions ---
 def parse_headers(headers):
     mapping = {
         'suctionPressures': [],
@@ -60,7 +59,6 @@ def analyze_data(data, headers):
                     "explanation": "Missing data can lead to incorrect analysis and may indicate sensor or logging issues.",
                     "suggestions": ["Check sensor connections.", "Ensure data logger is functioning.", "Manually review and fill missing entries."]
                 })
-
     # Mixed data types
     for colIdx, header in enumerate(headers):
         col_data = data.iloc[:, colIdx]
@@ -72,7 +70,6 @@ def analyze_data(data, headers):
                 "explanation": "Columns should contain consistent data types for accurate analysis.",
                 "suggestions": ["Standardize data entry.", "Remove or correct non-numeric entries.", "Validate sensor outputs."]
             })
-
     # Duplicate rows
     duplicates = data.duplicated()
     for idx, is_dup in enumerate(duplicates):
@@ -83,7 +80,6 @@ def analyze_data(data, headers):
                 "explanation": "Duplicate records can skew results and should be removed.",
                 "suggestions": ["Remove duplicate rows.", "Check for repeated data uploads."]
             })
-
     # Statistical outliers summarized
     for colIdx, header in enumerate(headers):
         col_data = pd.to_numeric(data.iloc[:, colIdx], errors='coerce')
@@ -95,7 +91,7 @@ def analyze_data(data, headers):
             lower = q1 - 1.5 * iqr
             upper = q3 + 1.5 * iqr
             outliers = nums[(nums < lower) | (nums > upper)]
-            if len(outliers) > 0:
+            if not outliers.empty:
                 issues.append({
                     "severity": "medium",
                     "message": f"Statistical outliers detected in \"{header}\"",
@@ -106,9 +102,7 @@ def analyze_data(data, headers):
                 })
     return issues
 
-# File upload
-uploaded_file = st.file_uploader("Upload CSV", type="csv")
-
+# --- Main App Logic ---
 if uploaded_file:
     content = uploaded_file.read().decode("utf-8")
     df = pd.read_csv(StringIO(content))
@@ -136,10 +130,9 @@ if uploaded_file:
     if mapping['date'] is not None:
         df['__date__'] = df.iloc[:, mapping['date']].apply(format_date)
         df = df[df['__date__'].notna()]
-        st.subheader("Time-Series Plots")
+        st.subheader("Time-Series Plot")
         fig, ax1 = plt.subplots()
         ax2 = ax1.twinx()
-
         for idx in mapping['suctionPressures']:
             ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx], color='blue')
         for idx in mapping['dischargePressures']:
@@ -148,7 +141,6 @@ if uploaded_file:
             ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx], color='red')
         for idx in mapping['supplyAirTemps']:
             ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx], color='orange')
-
         ax1.set_ylabel("Temperature")
         ax2.set_ylabel("Pressure")
         ax1.set_xlabel("Date")
@@ -167,7 +159,6 @@ if uploaded_file:
             report += f"Outlier Count: {issue['outlier_count']}\n"
             report += f"Outlier Range: {issue['outlier_range'][0]} to {issue['outlier_range'][1]}\n"
         report += "\n"
-
     st.download_button("Download Diagnostics Report", report, file_name="diagnostics_report.txt")
 
     st.subheader("HVAC Diagnostic Possibilities")
