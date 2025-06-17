@@ -1,9 +1,23 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from io import StringIO
 from datetime import datetime
-import matplotlib.pyplot as plt
+from PIL import Image
+
+# Load logo
+logo_path = "carolinas AIR"
+try:
+    logo = Image.open(logo_path)
+    st.image(logo, width=200)
+except:
+    st.warning("Logo could not be loaded.")
+
+# Custom page title
+page_title = st.text_input("Enter Webpage Title", "Air Carolinas Data Analysis")
+st.title(page_title)
 
 # Helper functions
 def parse_headers(headers):
@@ -36,7 +50,6 @@ def format_date(date_str):
 
 def analyze_data(data, headers):
     issues = []
-
     # Missing values
     for idx, row in data.iterrows():
         for colIdx, cell in enumerate(row):
@@ -82,7 +95,7 @@ def analyze_data(data, headers):
             lower = q1 - 1.5 * iqr
             upper = q3 + 1.5 * iqr
             outliers = nums[(nums < lower) | (nums > upper)]
-            if not outliers.empty:
+            if len(outliers) > 0:
                 issues.append({
                     "severity": "medium",
                     "message": f"Statistical outliers detected in \"{header}\"",
@@ -91,12 +104,9 @@ def analyze_data(data, headers):
                     "outlier_count": len(outliers),
                     "outlier_range": (outliers.min(), outliers.max())
                 })
-
     return issues
 
-# Streamlit UI
-st.title("Air Carolinas Data Analysis")
-
+# File upload
 uploaded_file = st.file_uploader("Upload CSV", type="csv")
 
 if uploaded_file:
@@ -142,11 +152,12 @@ if uploaded_file:
         ax1.set_ylabel("Temperature")
         ax2.set_ylabel("Pressure")
         ax1.set_xlabel("Date")
+        fig.autofmt_xdate(rotation=45)
         fig.legend(loc="upper right")
         st.pyplot(fig)
 
     # Download report
-    report = "Diagnostics Report\n\n"
+    report = f"Project: {page_title}\n\nDiagnostics:\n\n"
     for issue in issues:
         report += f"Severity: {issue['severity']}\n"
         report += f"Issue: {issue['message']}\n"
@@ -158,3 +169,14 @@ if uploaded_file:
         report += "\n"
 
     st.download_button("Download Diagnostics Report", report, file_name="diagnostics_report.txt")
+
+    st.subheader("HVAC Diagnostic Possibilities")
+    st.markdown("""
+- **Low Suction Temperature**: Check refrigerant charge, compressor, and expansion valve.
+- **Dirty or Clogged Filters**: Inspect and replace air filters regularly.
+- **Malfunctioning Thermostat**: Test thermostat accuracy and wiring.
+- **Inadequate Airflow**: Check fans, ducts, and vents for obstructions.
+- **Uneven Heating or Cooling**: Balance airflow, inspect dampers and zoning.
+- **Unit Not Turning On**: Check power supply, controls, and safety switches.
+- **Blown Fuses/Tripped Breakers**: Inspect electrical panel and wiring.
+""")
