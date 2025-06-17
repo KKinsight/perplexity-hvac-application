@@ -31,15 +31,15 @@ def parse_headers(headers):
     }
     for i, h in enumerate(headers):
         lower = h.lower()
-        if "suction pressure" in lower:
+        if "suction" in lower and "pressure" in lower:
             mapping['suctionPressures'].append(i)
-        if "discharge pressure" in lower:
+        elif "discharge" in lower and "pressure" in lower:
             mapping['dischargePressures'].append(i)
-        if "suction temp" in lower:
+        elif "suction" in lower and "temp" in lower:
             mapping['suctionTemps'].append(i)
-        if "supply air temp" in lower:
+        elif ("supply" in lower or "discharge" in lower) and "temp" in lower:
             mapping['supplyAirTemps'].append(i)
-        if "date" in lower and mapping['date'] is None:
+        elif "date" in lower and mapping['date'] is None:
             mapping['date'] = i
     return mapping
 
@@ -49,59 +49,100 @@ def format_date(date_str):
     except:
         return pd.NaT
 
-def analyze_data(data, headers):
+def analyze_hvac_data(data, headers):
     issues = []
-    # Missing values
-    for idx, row in data.iterrows():
-        for colIdx, cell in enumerate(row):
-            if pd.isna(cell) or cell == "":
+    
+    # HVAC-specific analysis based on actual data patterns
+    for colIdx, header in enumerate(headers):
+        col_data = pd.to_numeric(data.iloc[:, colIdx], errors='coerce').dropna()
+        if len(col_data) == 0:
+            continue
+            
+        header_lower = header.lower()
+        
+        # Suction Pressure Analysis
+        if "suction" in header_lower and "pressure" in header_lower:
+            if col_data.mean() < 60:  # Low suction pressure (typical range 60-80 psi for R-410A)
                 issues.append({
                     "severity": "high",
-                    "message": f"Missing value in row {idx + 2}, column \"{headers[colIdx]}\"",
-                    "explanation": "Missing data can lead to incorrect analysis and may indicate sensor or logging issues.",
-                    "suggestions": ["Check sensor connections.", "Ensure data logger is functioning.", "Manually review and fill missing entries."]
+                    "message": f"Low suction pressure detected in {header}",
+                    "explanation": "Low suction pressure typically indicates refrigerant undercharge, restriction in liquid line, or evaporator issues.",
+                    "suggestions": ["Check for refrigerant leaks", "Verify proper refrigerant charge", "Inspect liquid line for restrictions", "Check evaporator coil condition"]
                 })
-    # Mixed data types
-    for colIdx, header in enumerate(headers):
-        col_data = data.iloc[:, colIdx]
-        num_count = pd.to_numeric(col_data, errors='coerce').notna().sum()
-        if 0 < num_count < len(col_data):
-            issues.append({
-                "severity": "medium",
-                "message": f"Mixed data types in column \"{header}\"",
-                "explanation": "Columns should contain consistent data types for accurate analysis.",
-                "suggestions": ["Standardize data entry.", "Remove or correct non-numeric entries.", "Validate sensor outputs."]
-            })
-    # Duplicate rows
-    duplicates = data.duplicated()
-    for idx, is_dup in enumerate(duplicates):
-        if is_dup:
-            issues.append({
-                "severity": "low",
-                "message": f"Duplicate row at line {idx + 2}",
-                "explanation": "Duplicate records can skew results and should be removed.",
-                "suggestions": ["Remove duplicate rows.", "Check for repeated data uploads."]
-            })
-    # Statistical outliers summarized
-    for colIdx, header in enumerate(headers):
-        col_data = pd.to_numeric(data.iloc[:, colIdx], errors='coerce')
-        nums = col_data.dropna()
-        if len(nums) > 0:
-            q1 = np.percentile(nums, 25)
-            q3 = np.percentile(nums, 75)
-            iqr = q3 - q1
-            lower = q1 - 1.5 * iqr
-            upper = q3 + 1.5 * iqr
-            outliers = nums[(nums < lower) | (nums > upper)]
-            if not outliers.empty:
+            elif col_data.mean() > 90:  # High suction pressure
                 issues.append({
                     "severity": "medium",
-                    "message": f"Statistical outliers detected in \"{header}\"",
-                    "explanation": "Outliers may indicate faulty sensors or abnormal operating conditions.",
-                    "suggestions": ["Inspect sensor calibration.", "Review abnormal events.", "Filter outliers for trend analysis."],
-                    "outlier_count": len(outliers),
-                    "outlier_range": (outliers.min(), outliers.max())
+                    "message": f"High suction pressure detected in {header}",
+                    "explanation": "High suction pressure may indicate overcharge, compressor issues, or excessive heat load.",
+                    "suggestions": ["Check refrigerant charge level", "Inspect compressor operation", "Verify cooling load calculations", "Check for non-condensables"]
                 })
+        
+        # Discharge Pressure Analysis  
+        elif "discharge" in header_lower and "pressure" in header_lower:
+            if col_data.mean() > 400:  # High discharge pressure (varies by refrigerant)
+                issues.append({
+                    "severity": "high", 
+                    "message": f"High discharge pressure detected in {header}",
+                    "explanation": "High discharge pressure indicates condenser problems, overcharge, or airflow restrictions.",
+                    "suggestions": ["Clean condenser coil", "Check condenser fan operation", "Verify proper airflow", "Check for overcharge"]
+                })
+            elif col_data.mean() < 200:  # Low discharge pressure
+                issues.append({
+                    "severity": "medium",
+                    "message": f"Low discharge pressure detected in {header}",
+                    "explanation": "Low discharge pressure may indicate undercharge, compressor wear, or valve problems.",
+                    "suggestions": ["Check refrigerant charge", "Test compressor valves", "Inspect for internal leaks", "Verify compressor operation"]
+                })
+        
+        # Temperature Analysis
+        elif "temp" in header_lower:
+            temp_range = col_data.max() - col_data.min()
+            if "suction" in header_lower:
+                if col_data.mean() > 60:  # High suction temp
+                    issues.append({
+                        "severity": "medium",
+                        "message": f"High suction temperature in {header}",
+                        "explanation": "High suction temperature indicates low refrigerant charge or expansion valve problems.",
+                        "suggestions": ["Check superheat settings", "Verify refrigerant charge", "Inspect expansion valve", "Check for restrictions"]
+                    })
+                elif col_data.mean() < 32:  # Risk of freezing
+                    issues.append({
+                        "severity": "high",
+                        "message": f"Low suction temperature risk in {header}",
+                        "explanation": "Very low suction temperature risks liquid refrigerant returning to compressor.",
+                        "suggestions": ["Check superheat immediately", "Verify proper airflow", "Inspect expansion valve", "Check for flooding"]
+                    })
+            elif "supply" in header_lower or "discharge" in header_lower:
+                if col_data.mean() > 120:  # High discharge temp
+                    issues.append({
+                        "severity": "high",
+                        "message": f"High discharge temperature in {header}",
+                        "explanation": "High discharge temperature indicates compressor stress, poor heat rejection, or overcharge.",
+                        "suggestions": ["Check condenser operation", "Verify proper airflow", "Check refrigerant charge", "Inspect compressor condition"]
+                    })
+            
+            # Temperature stability analysis
+            if temp_range > 20:  # High temperature variation
+                issues.append({
+                    "severity": "medium", 
+                    "message": f"High temperature variation in {header}",
+                    "explanation": "Large temperature swings indicate cycling issues, control problems, or system instability.",
+                    "suggestions": ["Check thermostat operation", "Verify control settings", "Inspect for short cycling", "Check system sizing"]
+                })
+        
+        # General outlier detection with HVAC context
+        q1, q3 = np.percentile(col_data, [25, 75])
+        iqr = q3 - q1
+        outliers = col_data[(col_data < q1 - 1.5*iqr) | (col_data > q3 + 1.5*iqr)]
+        if len(outliers) > len(col_data) * 0.1:  # More than 10% outliers
+            issues.append({
+                "severity": "medium",
+                "message": f"Frequent unusual readings in {header}",
+                "explanation": "Multiple abnormal readings suggest equipment malfunction, sensor drift, or operating condition changes.",
+                "suggestions": ["Calibrate sensors", "Check equipment operation during outlier periods", "Review maintenance logs", "Monitor for patterns"],
+                "outlier_count": len(outliers)
+            })
+    
     return issues
 
 # --- Main App Logic ---
@@ -110,23 +151,30 @@ if uploaded_file:
     df = pd.read_csv(StringIO(content))
     headers = df.columns.tolist()
     mapping = parse_headers(headers)
-    issues = analyze_data(df, headers)
+    issues = analyze_hvac_data(df, headers)
 
     st.subheader("Data Preview")
     st.dataframe(df.head(10))
 
-    st.subheader("Diagnostics")
-    for issue in issues:
-        st.markdown(f"**Severity:** {issue['severity'].capitalize()}")
-        st.markdown(f"**Issue:** {issue['message']}")
-        st.markdown(f"**Explanation:** {issue['explanation']}")
-        st.markdown("**Suggestions:**")
-        for s in issue['suggestions']:
-            st.markdown(f"- {s}")
-        if "outlier_count" in issue:
-            st.markdown(f"**Outlier Count:** {issue['outlier_count']}")
-            st.markdown(f"**Outlier Range:** {issue['outlier_range'][0]} to {issue['outlier_range'][1]}")
-        st.markdown("---")
+    st.subheader("HVAC Data Analysis")
+    if issues:
+        for issue in issues:
+            if issue['severity'] == 'high':
+                st.error(f"🔴 **{issue['message']}**")
+            elif issue['severity'] == 'medium':
+                st.warning(f"🟡 **{issue['message']}**")
+            else:
+                st.info(f"🔵 **{issue['message']}**")
+            
+            st.markdown(f"**Why this matters:** {issue['explanation']}")
+            st.markdown("**Recommended actions:**")
+            for s in issue['suggestions']:
+                st.markdown(f"• {s}")
+            if "outlier_count" in issue:
+                st.markdown(f"**Affected readings:** {issue['outlier_count']}")
+            st.markdown("---")
+    else:
+        st.success("✅ No immediate HVAC issues detected in the data analysis.")
 
     # Time-series plot
     if mapping['date'] is not None:
@@ -151,17 +199,24 @@ if uploaded_file:
         st.pyplot(fig)
 
     # Download report
-    report = f"Project: {project_title}\n\nDiagnostics:\n\n"
-    for issue in issues:
-        report += f"Severity: {issue['severity']}\n"
-        report += f"Issue: {issue['message']}\n"
-        report += f"Explanation: {issue['explanation']}\n"
-        report += f"Suggestions: {'; '.join(issue['suggestions'])}\n"
-        if "outlier_count" in issue:
-            report += f"Outlier Count: {issue['outlier_count']}\n"
-            report += f"Outlier Range: {issue['outlier_range'][0]} to {issue['outlier_range'][1]}\n"
-        report += "\n"
-    st.download_button("Download Diagnostics Report", report, file_name="diagnostics_report.txt")
+    report_lines = [f"HVAC Diagnostic Report - {project_title}", "="*50, "", "DATA ANALYSIS FINDINGS:", ""]
+    
+    if issues:
+        for issue in issues:
+            report_lines.extend([
+                f"SEVERITY: {issue['severity'].upper()}",
+                f"ISSUE: {issue['message']}",
+                f"EXPLANATION: {issue['explanation']}",
+                f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+            ])
+            if "outlier_count" in issue:
+                report_lines.append(f"AFFECTED READINGS: {issue['outlier_count']}")
+            report_lines.extend(["", "-"*40, ""])
+    else:
+        report_lines.append("No immediate HVAC issues detected in data analysis.")
+    
+    report = "\n".join(report_lines)
+    st.download_button("Download Diagnostics Report", report, file_name=f"hvac_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt")
 
     st.subheader("Comprehensive HVAC Diagnostic Reference")
     st.markdown("### 🔧 **Refrigeration System Issues**")
