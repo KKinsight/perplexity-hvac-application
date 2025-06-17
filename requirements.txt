@@ -1,4 +1,4 @@
 streamlit
-npx create-react-app air-carolinas-data
-cd air-carolinas-data
-npm install @mui/material @mui/icons-material papaparse chart.js react-chartjs-2 file-saver dayjs
+pandas
+numpy
+matplotlib
