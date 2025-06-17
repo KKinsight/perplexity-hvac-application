@@ -146,13 +146,14 @@ page_title = st.sidebar.text_input("Webpage Title", "Air Carolinas Data Analysis
 # --- File Upload ---
 uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
 
-if uploaded_file:
-    # Read and process the uploaded file
-    content = uploaded_file.read().decode("utf-8")
-    df = pd.read_csv(StringIO(content))
-    headers = df.columns.tolist()
-    mapping = parse_headers(headers)
-    issues = analyze_hvac_data(df, headers)
+if uploaded_file is not None:
+    try:
+        # Read and process the uploaded file
+        content = uploaded_file.read().decode("utf-8")
+        df = pd.read_csv(StringIO(content))
+        headers = df.columns.tolist()
+        mapping = parse_headers(headers)
+        issues = analyze_hvac_data(df, headers)
 
     # --- Main App Logic ---
     st.subheader("Data Preview")
@@ -239,6 +240,10 @@ if uploaded_file:
     report = "\n".join(report_lines)
     st.download_button("Download Diagnostics Report", report, 
                       file_name=f"hvac_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt")
+
+    except Exception as e:
+        st.error(f"Error processing file: {str(e)}")
+        st.info("Please make sure your CSV file is properly formatted and contains valid data.")
 
 else:
     st.info("👆 Please upload a CSV file to begin HVAC data analysis")
