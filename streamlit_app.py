@@ -486,20 +486,3 @@ def analyze_hvac_data(data, headers):
 
     st.markdown("---")
     st.markdown("**💡 Pro Tip:** Always start diagnostics with basic checks (power, filters, settings) before moving to complex system analysis. Document all findings and maintain detailed service records for trend analysis.")
-
-else:
-    st.info("Please upload a CSV file to begin HVAC diagnostics analysis.")
-    st.markdown("### How to Use This Tool")
-    st.markdown("""
-    1. **Upload Logo** (optional): Add your company logo in the sidebar
-    2. **Enter Project Title**: Customize the report title
-    3. **Upload CSV Data**: Include columns for:
-       - Date/timestamp
-       - Suction pressures
-       - Discharge pressures  
-       - Suction temperatures
-       - Supply air temperatures
-    4. **Review Analysis**: Check for data quality issues and outliers
-    5. **Reference Diagnostics**: Use the comprehensive problem guide below
-    6. **Download Report**: Generate a text report of findings
-    """)
