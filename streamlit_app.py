@@ -155,91 +155,91 @@ if uploaded_file is not None:
         mapping = parse_headers(headers)
         issues = analyze_hvac_data(df, headers)
 
-    # --- Main App Logic ---
-    st.subheader("Data Preview")
-    st.dataframe(df.head(10))
+        # --- Main App Logic ---
+        st.subheader("Data Preview")
+        st.dataframe(df.head(10))
 
-    st.subheader("HVAC Data Analysis")
-    if issues:
-        for issue in issues:
-            if issue['severity'] == 'high':
-                st.error(f"🔴 **{issue['message']}**")
-            elif issue['severity'] == 'medium':
-                st.warning(f"🟡 **{issue['message']}**")
-            else:
-                st.info(f"🔵 **{issue['message']}**")
+        st.subheader("HVAC Data Analysis")
+        if issues:
+            for issue in issues:
+                if issue['severity'] == 'high':
+                    st.error(f"🔴 **{issue['message']}**")
+                elif issue['severity'] == 'medium':
+                    st.warning(f"🟡 **{issue['message']}**")
+                else:
+                    st.info(f"🔵 **{issue['message']}**")
+                
+                st.markdown(f"**Why this matters:** {issue['explanation']}")
+                st.markdown("**Recommended actions:**")
+                for s in issue['suggestions']:
+                    st.markdown(f"• {s}")
+                if "outlier_count" in issue:
+                    st.markdown(f"**Affected readings:** {issue['outlier_count']}")
+                st.markdown("---")
+        else:
+            st.success("✅ No immediate HVAC issues detected in the data analysis.")
+
+        # Time-series plot
+        if mapping['date'] is not None:
+            df['__date__'] = df.iloc[:, mapping['date']].apply(format_date)
+            df = df[df['__date__'].notna()]
+            st.subheader("Time-Series Plot")
+            fig, ax1 = plt.subplots(figsize=(12, 6))
+            ax2 = ax1.twinx()
             
-            st.markdown(f"**Why this matters:** {issue['explanation']}")
-            st.markdown("**Recommended actions:**")
-            for s in issue['suggestions']:
-                st.markdown(f"• {s}")
-            if "outlier_count" in issue:
-                st.markdown(f"**Affected readings:** {issue['outlier_count']}")
-            st.markdown("---")
-    else:
-        st.success("✅ No immediate HVAC issues detected in the data analysis.")
+            # Plot pressures on secondary y-axis
+            for idx in mapping['suctionPressures']:
+                ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
+                        label=headers[idx], color='blue', linestyle='-')
+            for idx in mapping['dischargePressures']:
+                ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
+                        label=headers[idx], color='navy', linestyle='-')
+            
+            # Plot temperatures on primary y-axis
+            for idx in mapping['suctionTemps']:
+                ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
+                        label=headers[idx], color='red', linestyle='--')
+            for idx in mapping['supplyAirTemps']:
+                ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
+                        label=headers[idx], color='orange', linestyle='--')
+            
+            ax1.set_ylabel("Temperature (°F)", color='red')
+            ax2.set_ylabel("Pressure (PSI)", color='blue')
+            ax1.set_xlabel("Date")
+            ax1.tick_params(axis='y', labelcolor='red')
+            ax2.tick_params(axis='y', labelcolor='blue')
+            
+            # Format x-axis dates
+            fig.autofmt_xdate(rotation=45)
+            
+            # Add legends
+            lines1, labels1 = ax1.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
+            
+            plt.tight_layout()
+            st.pyplot(fig)
 
-    # Time-series plot
-    if mapping['date'] is not None:
-        df['__date__'] = df.iloc[:, mapping['date']].apply(format_date)
-        df = df[df['__date__'].notna()]
-        st.subheader("Time-Series Plot")
-        fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax2 = ax1.twinx()
+        # Download report
+        report_lines = [f"HVAC Diagnostic Report - {project_title}", "="*50, "", "DATA ANALYSIS FINDINGS:", ""]
         
-        # Plot pressures on secondary y-axis
-        for idx in mapping['suctionPressures']:
-            ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                    label=headers[idx], color='blue', linestyle='-')
-        for idx in mapping['dischargePressures']:
-            ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                    label=headers[idx], color='navy', linestyle='-')
+        if issues:
+            for issue in issues:
+                report_lines.extend([
+                    f"SEVERITY: {issue['severity'].upper()}",
+                    f"ISSUE: {issue['message']}",
+                    f"EXPLANATION: {issue['explanation']}",
+                    f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                ])
+                if "outlier_count" in issue:
+                    report_lines.append(f"AFFECTED READINGS: {issue['outlier_count']}")
+                report_lines.extend(["", "-"*40, ""])
+        else:
+            report_lines.append("No immediate HVAC issues detected in data analysis.")
         
-        # Plot temperatures on primary y-axis
-        for idx in mapping['suctionTemps']:
-            ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                    label=headers[idx], color='red', linestyle='--')
-        for idx in mapping['supplyAirTemps']:
-            ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                    label=headers[idx], color='orange', linestyle='--')
-        
-        ax1.set_ylabel("Temperature (°F)", color='red')
-        ax2.set_ylabel("Pressure (PSI)", color='blue')
-        ax1.set_xlabel("Date")
-        ax1.tick_params(axis='y', labelcolor='red')
-        ax2.tick_params(axis='y', labelcolor='blue')
-        
-        # Format x-axis dates
-        fig.autofmt_xdate(rotation=45)
-        
-        # Add legends
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
-        
-        plt.tight_layout()
-        st.pyplot(fig)
-
-    # Download report
-    report_lines = [f"HVAC Diagnostic Report - {project_title}", "="*50, "", "DATA ANALYSIS FINDINGS:", ""]
-    
-    if issues:
-        for issue in issues:
-            report_lines.extend([
-                f"SEVERITY: {issue['severity'].upper()}",
-                f"ISSUE: {issue['message']}",
-                f"EXPLANATION: {issue['explanation']}",
-                f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
-            ])
-            if "outlier_count" in issue:
-                report_lines.append(f"AFFECTED READINGS: {issue['outlier_count']}")
-            report_lines.extend(["", "-"*40, ""])
-    else:
-        report_lines.append("No immediate HVAC issues detected in data analysis.")
-    
-    report = "\n".join(report_lines)
-    st.download_button("Download Diagnostics Report", report, 
-                      file_name=f"hvac_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt")
+        report = "\n".join(report_lines)
+        st.download_button("Download Diagnostics Report", report, 
+                          file_name=f"hvac_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt")
 
     except Exception as e:
         st.error(f"Error processing file: {str(e)}")
