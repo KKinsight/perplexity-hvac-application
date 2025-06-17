@@ -16,6 +16,7 @@ if logo_file:
 # Title and project input
 project_title = st.text_input("Enter Project Title", "HVAC Diagnostic Report")
 st.title(project_title)
+page_title = st.sidebar.text_input("Webpage Title", "Air Carolinas Data Analysis")
 
 # --- File Upload ---
 uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
