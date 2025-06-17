@@ -15,7 +15,7 @@ st.title(project_title)
 # --- Display Logo and Title ---
 if logo_file:
     st.image(logo_file, width=200)
-st.title(page_title)
+st.title(project_title)
 
 # --- File Upload ---
 uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
