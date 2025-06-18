@@ -2,9 +2,15 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from io import StringIO
+from io import StringIO, BytesIO
 from datetime import datetime
 import base64
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 
 # --- Helper Functions (Define before use) ---
 def parse_headers(headers):
@@ -212,13 +218,183 @@ def generate_diagnostic_reference(detected_issues):
     
     return reference_content
 
-def get_base64_image(uploaded_file):
-    """Convert uploaded image to base64 string"""
-    if uploaded_file is not None:
-        bytes_data = uploaded_file.getvalue()
-        base64_string = base64.b64encode(bytes_data).decode()
-        return base64_string
-    return None
+def generate_pdf_report(project_title, logo_file, issues, df_summary=None):
+    """Generate a comprehensive PDF report"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Get styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        textColor=colors.darkblue
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceAfter=12,
+        spaceBefore=12,
+        textColor=colors.darkblue
+    )
+    
+    subheading_style = ParagraphStyle(
+        'CustomSubHeading',
+        parent=styles['Heading3'],
+        fontSize=14,
+        spaceAfter=8,
+        spaceBefore=8,
+        textColor=colors.darkred
+    )
+    
+    normal_style = styles['Normal']
+    normal_style.alignment = TA_JUSTIFY
+    
+    # Build the PDF content
+    story = []
+    
+    # Add logo if provided
+    if logo_file:
+        try:
+            logo_file.seek(0)  # Reset file pointer
+            logo = Image(logo_file, width=2*inch, height=1*inch)
+            logo.hAlign = 'CENTER'
+            story.append(logo)
+            story.append(Spacer(1, 12))
+        except:
+            pass
+    
+    # Title
+    story.append(Paragraph(project_title, title_style))
+    story.append(Paragraph("HVAC Diagnostic Analysis Report", heading_style))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Executive Summary
+    story.append(Paragraph("Executive Summary", heading_style))
+    if issues:
+        high_count = len([i for i in issues if i['severity'] == 'high'])
+        medium_count = len([i for i in issues if i['severity'] == 'medium'])
+        low_count = len([i for i in issues if i['severity'] == 'low'])
+        
+        summary_text = f"""
+        This report analyzes HVAC system performance data and identifies {len(issues)} total issues requiring attention:
+        <br/>• {high_count} High Priority Issues (require immediate attention)
+        <br/>• {medium_count} Medium Priority Issues (should be addressed soon)
+        <br/>• {low_count} Low Priority Issues (monitor and plan maintenance)
+        """
+        story.append(Paragraph(summary_text, normal_style))
+    else:
+        story.append(Paragraph("System analysis shows no immediate issues detected. All parameters appear to be within normal operating ranges.", normal_style))
+    
+    story.append(Spacer(1, 20))
+    
+    # Detailed Findings
+    story.append(Paragraph("Detailed Findings", heading_style))
+    
+    if issues:
+        # Group issues by severity
+        high_issues = [i for i in issues if i['severity'] == 'high']
+        medium_issues = [i for i in issues if i['severity'] == 'medium']
+        low_issues = [i for i in issues if i['severity'] == 'low']
+        
+        # High Priority Issues
+        if high_issues:
+            story.append(Paragraph("🔴 HIGH PRIORITY ISSUES", subheading_style))
+            for i, issue in enumerate(high_issues, 1):
+                story.append(Paragraph(f"<b>{i}. {issue['message']}</b>", normal_style))
+                story.append(Paragraph(f"<b>Explanation:</b> {issue['explanation']}", normal_style))
+                
+                recommendations = "<br/>".join([f"• {rec}" for rec in issue['suggestions']])
+                story.append(Paragraph(f"<b>Recommended Actions:</b><br/>{recommendations}", normal_style))
+                
+                if "outlier_count" in issue:
+                    story.append(Paragraph(f"<b>Affected Readings:</b> {issue['outlier_count']}", normal_style))
+                story.append(Spacer(1, 12))
+        
+        # Medium Priority Issues
+        if medium_issues:
+            story.append(Paragraph("🟡 MEDIUM PRIORITY ISSUES", subheading_style))
+            for i, issue in enumerate(medium_issues, 1):
+                story.append(Paragraph(f"<b>{i}. {issue['message']}</b>", normal_style))
+                story.append(Paragraph(f"<b>Explanation:</b> {issue['explanation']}", normal_style))
+                
+                recommendations = "<br/>".join([f"• {rec}" for rec in issue['suggestions']])
+                story.append(Paragraph(f"<b>Recommended Actions:</b><br/>{recommendations}", normal_style))
+                
+                if "outlier_count" in issue:
+                    story.append(Paragraph(f"<b>Affected Readings:</b> {issue['outlier_count']}", normal_style))
+                story.append(Spacer(1, 12))
+        
+        # Low Priority Issues
+        if low_issues:
+            story.append(Paragraph("🔵 LOW PRIORITY ISSUES", subheading_style))
+            for i, issue in enumerate(low_issues, 1):
+                story.append(Paragraph(f"<b>{i}. {issue['message']}</b>", normal_style))
+                story.append(Paragraph(f"<b>Explanation:</b> {issue['explanation']}", normal_style))
+                
+                recommendations = "<br/>".join([f"• {rec}" for rec in issue['suggestions']])
+                story.append(Paragraph(f"<b>Recommended Actions:</b><br/>{recommendations}", normal_style))
+                
+                if "outlier_count" in issue:
+                    story.append(Paragraph(f"<b>Affected Readings:</b> {issue['outlier_count']}", normal_style))
+                story.append(Spacer(1, 12))
+    
+    # Add data summary if provided
+    if df_summary is not None:
+        story.append(PageBreak())
+        story.append(Paragraph("Data Summary Statistics", heading_style))
+        
+        # Create a simple table with basic stats
+        try:
+            numeric_df = df_summary.select_dtypes(include=[np.number])
+            if not numeric_df.empty:
+                stats_data = [['Parameter', 'Mean', 'Min', 'Max', 'Std Dev']]
+                for col in numeric_df.columns[:10]:  # Limit to first 10 columns
+                    stats_data.append([
+                        col,
+                        f"{numeric_df[col].mean():.2f}",
+                        f"{numeric_df[col].min():.2f}",
+                        f"{numeric_df[col].max():.2f}",
+                        f"{numeric_df[col].std():.2f}"
+                    ])
+                
+                table = Table(stats_data)
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(table)
+        except:
+            story.append(Paragraph("Data summary statistics could not be generated.", normal_style))
+    
+    # Footer
+    story.append(Spacer(1, 30))
+    story.append(Paragraph("Report Notes", heading_style))
+    story.append(Paragraph("""
+    This automated diagnostic report is based on pattern analysis of HVAC system data. 
+    All recommendations should be verified by qualified HVAC technicians before implementation. 
+    Regular maintenance and professional inspections are essential for optimal system performance.
+    """, normal_style))
+    
+    story.append(Spacer(1, 20))
+    story.append(Paragraph(f"Generated by {project_title} Analysis System", normal_style))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 # --- Sidebar Configuration ---
 st.sidebar.title("Configuration")
@@ -344,81 +520,97 @@ if uploaded_file is not None:
                         for solution in details['solutions']:
                             st.markdown(f"• {solution}")
 
-        # Enhanced Download report with logo and title
-        report_lines = [
-            f"{project_title}",
-            "="*len(project_title),
-            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            ""
-        ]
+        # Enhanced Download report as PDF
+        st.subheader("📄 Generate Professional Report")
         
-        if logo_file:
-            logo_base64 = get_base64_image(logo_file)
-            if logo_base64:
-                report_lines.extend([
-                    f"Company Logo: [Base64 Encoded - {len(logo_base64)} characters]",
-                    ""
-                ])
+        col1, col2 = st.columns(2)
         
-        report_lines.extend([
-            "HVAC DIAGNOSTIC ANALYSIS REPORT",
-            "="*50,
-            "",
-            "SYSTEM DATA ANALYSIS FINDINGS:",
-            ""
-        ])
-        
-        if issues:
-            high_issues = [i for i in issues if i['severity'] == 'high']
-            medium_issues = [i for i in issues if i['severity'] == 'medium']
-            low_issues = [i for i in issues if i['severity'] == 'low']
-            
-            if high_issues:
-                report_lines.extend(["HIGH PRIORITY ISSUES:", "-"*20])
-                for issue in high_issues:
-                    report_lines.extend([
-                        f"ISSUE: {issue['message']}",
-                        f"EXPLANATION: {issue['explanation']}",
-                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+        with col1:
+            if st.button("📄 Generate PDF Report", type="primary"):
+                try:
+                    # Generate PDF
+                    pdf_buffer = generate_pdf_report(project_title, logo_file, issues, df)
+                    
+                    # Offer download
+                    st.download_button(
+                        label="⬇️ Download PDF Report",
+                        data=pdf_buffer.getvalue(),
+                        file_name=f"{project_title.replace(' ', '_')}_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                        mime="application/pdf"
+                    )
+                    st.success("✅ PDF report generated successfully!")
+                    
+                except Exception as e:
+                    st.error(f"Error generating PDF: {str(e)}")
+                    st.info("PDF generation requires additional libraries. Falling back to text report.")
+                    
+                    # Fallback to text report
+                    report_lines = [
+                        f"{project_title}",
+                        "="*len(project_title),
+                        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                        "",
+                        "HVAC DIAGNOSTIC ANALYSIS REPORT",
+                        "="*50,
+                        "",
+                        "SYSTEM DATA ANALYSIS FINDINGS:",
                         ""
-                    ])
-            
-            if medium_issues:
-                report_lines.extend(["MEDIUM PRIORITY ISSUES:", "-"*22])
-                for issue in medium_issues:
+                    ]
+                    
+                    if issues:
+                        high_issues = [i for i in issues if i['severity'] == 'high']
+                        medium_issues = [i for i in issues if i['severity'] == 'medium']
+                        low_issues = [i for i in issues if i['severity'] == 'low']
+                        
+                        if high_issues:
+                            report_lines.extend(["HIGH PRIORITY ISSUES:", "-"*20])
+                            for issue in high_issues:
+                                report_lines.extend([
+                                    f"ISSUE: {issue['message']}",
+                                    f"EXPLANATION: {issue['explanation']}",
+                                    f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                                    ""
+                                ])
+                        
+                        if medium_issues:
+                            report_lines.extend(["MEDIUM PRIORITY ISSUES:", "-"*22])
+                            for issue in medium_issues:
+                                report_lines.extend([
+                                    f"ISSUE: {issue['message']}",
+                                    f"EXPLANATION: {issue['explanation']}",
+                                    f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                                    ""
+                                ])
+                        
+                        if low_issues:
+                            report_lines.extend(["LOW PRIORITY ISSUES:", "-"*19])
+                            for issue in low_issues:
+                                report_lines.extend([
+                                    f"ISSUE: {issue['message']}",
+                                    f"EXPLANATION: {issue['explanation']}",
+                                    f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                                    ""
+                                ])
+                    else:
+                        report_lines.append("✅ No immediate HVAC issues detected in data analysis.")
+                    
                     report_lines.extend([
-                        f"ISSUE: {issue['message']}",
-                        f"EXPLANATION: {issue['explanation']}",
-                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
-                        ""
+                        "",
+                        "="*50,
+                        f"Report generated by {project_title} Analysis System",
+                        f"For technical support, please contact your HVAC service provider."
                     ])
-            
-            if low_issues:
-                report_lines.extend(["LOW PRIORITY ISSUES:", "-"*19])
-                for issue in low_issues:
-                    report_lines.extend([
-                        f"ISSUE: {issue['message']}",
-                        f"EXPLANATION: {issue['explanation']}",
-                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
-                        ""
-                    ])
-        else:
-            report_lines.append("✅ No immediate HVAC issues detected in data analysis.")
+                    
+                    report = "\n".join(report_lines)
+                    st.download_button(
+                        "📄 Download Text Report (Fallback)", 
+                        report, 
+                        file_name=f"{project_title.replace(' ', '_')}_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                        mime="text/plain"
+                    )
         
-        report_lines.extend([
-            "",
-            "="*50,
-            f"Report generated by {project_title} Analysis System",
-            f"For technical support, please contact your HVAC service provider."
-        ])
-        
-        report = "\n".join(report_lines)
-        st.download_button(
-            "📄 Download Comprehensive Diagnostics Report", 
-            report, 
-            file_name=f"{project_title.replace(' ', '_')}_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-            mime="text/plain"
-        )
+        with col2:
+            st.info("📋 **PDF Report Includes:**\n- Executive Summary\n- Detailed Issue Analysis\n- Recommendations\n- Data Statistics\n- Professional Formatting")
 
     except Exception as e:
         st.error(f"Error processing file: {str(e)}")
