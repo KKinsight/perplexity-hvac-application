@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from io import StringIO
 from datetime import datetime
+import base64
 
 # --- Helper Functions (Define before use) ---
 def parse_headers(headers):
@@ -52,14 +53,16 @@ def analyze_hvac_data(data, headers):
                     "severity": "high",
                     "message": f"Low suction pressure detected in {header}",
                     "explanation": "Low suction pressure typically indicates refrigerant undercharge, restriction in liquid line, or evaporator issues.",
-                    "suggestions": ["Check for refrigerant leaks", "Verify proper refrigerant charge", "Inspect liquid line for restrictions", "Check evaporator coil condition"]
+                    "suggestions": ["Check for refrigerant leaks", "Verify proper refrigerant charge", "Inspect liquid line for restrictions", "Check evaporator coil condition"],
+                    "issue_type": "refrigerant_system"
                 })
             elif col_data.mean() > 90:  # High suction pressure
                 issues.append({
                     "severity": "medium",
                     "message": f"High suction pressure detected in {header}",
                     "explanation": "High suction pressure may indicate overcharge, compressor issues, or excessive heat load.",
-                    "suggestions": ["Check refrigerant charge level", "Inspect compressor operation", "Verify cooling load calculations", "Check for non-condensables"]
+                    "suggestions": ["Check refrigerant charge level", "Inspect compressor operation", "Verify cooling load calculations", "Check for non-condensables"],
+                    "issue_type": "refrigerant_system"
                 })
         
         # Discharge Pressure Analysis  
@@ -69,14 +72,16 @@ def analyze_hvac_data(data, headers):
                     "severity": "high", 
                     "message": f"High discharge pressure detected in {header}",
                     "explanation": "High discharge pressure indicates condenser problems, overcharge, or airflow restrictions.",
-                    "suggestions": ["Clean condenser coil", "Check condenser fan operation", "Verify proper airflow", "Check for overcharge"]
+                    "suggestions": ["Clean condenser coil", "Check condenser fan operation", "Verify proper airflow", "Check for overcharge"],
+                    "issue_type": "condenser_system"
                 })
             elif col_data.mean() < 200:  # Low discharge pressure
                 issues.append({
                     "severity": "medium",
                     "message": f"Low discharge pressure detected in {header}",
                     "explanation": "Low discharge pressure may indicate undercharge, compressor wear, or valve problems.",
-                    "suggestions": ["Check refrigerant charge", "Test compressor valves", "Inspect for internal leaks", "Verify compressor operation"]
+                    "suggestions": ["Check refrigerant charge", "Test compressor valves", "Inspect for internal leaks", "Verify compressor operation"],
+                    "issue_type": "compressor_system"
                 })
         
         # Temperature Analysis
@@ -88,14 +93,16 @@ def analyze_hvac_data(data, headers):
                         "severity": "medium",
                         "message": f"High suction temperature in {header}",
                         "explanation": "High suction temperature indicates low refrigerant charge or expansion valve problems.",
-                        "suggestions": ["Check superheat settings", "Verify refrigerant charge", "Inspect expansion valve", "Check for restrictions"]
+                        "suggestions": ["Check superheat settings", "Verify refrigerant charge", "Inspect expansion valve", "Check for restrictions"],
+                        "issue_type": "refrigerant_system"
                     })
                 elif col_data.mean() < 32:  # Risk of freezing
                     issues.append({
                         "severity": "high",
                         "message": f"Low suction temperature risk in {header}",
                         "explanation": "Very low suction temperature risks liquid refrigerant returning to compressor.",
-                        "suggestions": ["Check superheat immediately", "Verify proper airflow", "Inspect expansion valve", "Check for flooding"]
+                        "suggestions": ["Check superheat immediately", "Verify proper airflow", "Inspect expansion valve", "Check for flooding"],
+                        "issue_type": "refrigerant_system"
                     })
             elif "supply" in header_lower or "discharge" in header_lower:
                 if col_data.mean() > 120:  # High discharge temp
@@ -103,7 +110,8 @@ def analyze_hvac_data(data, headers):
                         "severity": "high",
                         "message": f"High discharge temperature in {header}",
                         "explanation": "High discharge temperature indicates compressor stress, poor heat rejection, or overcharge.",
-                        "suggestions": ["Check condenser operation", "Verify proper airflow", "Check refrigerant charge", "Inspect compressor condition"]
+                        "suggestions": ["Check condenser operation", "Verify proper airflow", "Check refrigerant charge", "Inspect compressor condition"],
+                        "issue_type": "compressor_system"
                     })
             
             # Temperature stability analysis
@@ -112,7 +120,8 @@ def analyze_hvac_data(data, headers):
                     "severity": "medium", 
                     "message": f"High temperature variation in {header}",
                     "explanation": "Large temperature swings indicate cycling issues, control problems, or system instability.",
-                    "suggestions": ["Check thermostat operation", "Verify control settings", "Inspect for short cycling", "Check system sizing"]
+                    "suggestions": ["Check thermostat operation", "Verify control settings", "Inspect for short cycling", "Check system sizing"],
+                    "issue_type": "control_system"
                 })
         
         # General outlier detection with HVAC context
@@ -125,10 +134,91 @@ def analyze_hvac_data(data, headers):
                 "message": f"Frequent unusual readings in {header}",
                 "explanation": "Multiple abnormal readings suggest equipment malfunction, sensor drift, or operating condition changes.",
                 "suggestions": ["Calibrate sensors", "Check equipment operation during outlier periods", "Review maintenance logs", "Monitor for patterns"],
-                "outlier_count": len(outliers)
+                "outlier_count": len(outliers),
+                "issue_type": "sensor_system"
             })
     
     return issues
+
+def generate_diagnostic_reference(detected_issues):
+    """Generate diagnostic reference based on detected issues"""
+    issue_types = set()
+    for issue in detected_issues:
+        issue_types.add(issue.get('issue_type', 'general'))
+    
+    reference_content = {}
+    
+    if 'refrigerant_system' in issue_types:
+        reference_content['Refrigerant System Issues'] = {
+            'Low Refrigerant Charge': {
+                'symptoms': 'Low suction pressure, high superheat, poor cooling capacity',
+                'causes': 'Refrigerant leaks, improper charging, system evacuation issues',
+                'diagnostics': ['Check superheat and subcooling values', 'Perform leak detection', 'Verify refrigerant type and charging procedures'],
+                'solutions': ['Locate and repair leaks', 'Properly evacuate and recharge system']
+            },
+            'High Suction Temperature': {
+                'symptoms': 'Elevated suction line temperature, poor cooling performance',
+                'causes': 'Low refrigerant charge, expansion valve problems, restrictions',
+                'diagnostics': ['Measure superheat at evaporator outlet', 'Check expansion valve operation', 'Inspect for line restrictions'],
+                'solutions': ['Adjust superheat settings', 'Replace expansion valve', 'Clear restrictions']
+            }
+        }
+    
+    if 'compressor_system' in issue_types:
+        reference_content['Compressor System Issues'] = {
+            'Compressor Performance Problems': {
+                'symptoms': 'Unusual pressures, high discharge temperature, poor efficiency',
+                'causes': 'Mechanical wear, electrical issues, refrigerant problems',
+                'diagnostics': ['Check compressor amp draw', 'Test valve operation', 'Monitor discharge temperature'],
+                'solutions': ['Replace worn components', 'Repair electrical connections', 'Address refrigerant issues']
+            },
+            'High Discharge Temperature': {
+                'symptoms': 'Compressor overheating, reduced efficiency, potential failure',
+                'causes': 'Poor heat rejection, overcharge, compressor wear',
+                'diagnostics': ['Check condenser operation', 'Verify refrigerant charge', 'Test compressor condition'],
+                'solutions': ['Clean condenser', 'Adjust refrigerant charge', 'Replace compressor if needed']
+            }
+        }
+    
+    if 'condenser_system' in issue_types:
+        reference_content['Condenser System Issues'] = {
+            'High Discharge Pressure': {
+                'symptoms': 'Excessive head pressure, poor cooling, high energy consumption',
+                'causes': 'Dirty condenser coil, fan problems, airflow restrictions',
+                'diagnostics': ['Check condenser coil condition', 'Test fan operation', 'Measure airflow'],
+                'solutions': ['Clean condenser coil', 'Repair fan motor', 'Clear airflow restrictions']
+            }
+        }
+    
+    if 'control_system' in issue_types:
+        reference_content['Control System Issues'] = {
+            'Temperature Control Problems': {
+                'symptoms': 'Temperature swings, short cycling, poor comfort',
+                'causes': 'Faulty thermostat, sensor issues, control calibration',
+                'diagnostics': ['Check thermostat calibration', 'Test sensor accuracy', 'Verify control settings'],
+                'solutions': ['Replace thermostat', 'Calibrate sensors', 'Adjust control parameters']
+            }
+        }
+    
+    if 'sensor_system' in issue_types:
+        reference_content['Sensor and Monitoring Issues'] = {
+            'Sensor Drift and Calibration': {
+                'symptoms': 'Inconsistent readings, frequent outliers, poor system response',
+                'causes': 'Sensor aging, environmental factors, calibration drift',
+                'diagnostics': ['Compare readings with calibrated instruments', 'Check sensor wiring', 'Review historical data'],
+                'solutions': ['Recalibrate sensors', 'Replace aged sensors', 'Improve sensor protection']
+            }
+        }
+    
+    return reference_content
+
+def get_base64_image(uploaded_file):
+    """Convert uploaded image to base64 string"""
+    if uploaded_file is not None:
+        bytes_data = uploaded_file.getvalue()
+        base64_string = base64.b64encode(bytes_data).decode()
+        return base64_string
+    return None
 
 # --- Sidebar Configuration ---
 st.sidebar.title("Configuration")
@@ -159,7 +249,7 @@ if uploaded_file is not None:
         st.subheader("Data Preview")
         st.dataframe(df.head(10))
 
-        st.subheader("HVAC Data Analysis")
+        st.subheader("HVAC Diagnostic Analysis")
         if issues:
             for issue in issues:
                 if issue['severity'] == 'high':
@@ -179,33 +269,44 @@ if uploaded_file is not None:
         else:
             st.success("✅ No immediate HVAC issues detected in the data analysis.")
 
-        # Time-series plot
+        # Time-series plot with improved suction temperature handling
         if mapping['date'] is not None:
             df['__date__'] = df.iloc[:, mapping['date']].apply(format_date)
             df = df[df['__date__'].notna()]
-            st.subheader("Time-Series Plot")
+            st.subheader("Time-Series Analysis")
             fig, ax1 = plt.subplots(figsize=(12, 6))
             ax2 = ax1.twinx()
             
             # Plot pressures on secondary y-axis
             for idx in mapping['suctionPressures']:
                 ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=headers[idx], color='blue', linestyle='-')
+                        label=f"{headers[idx]} (Pressure)", color='blue', linestyle='-', linewidth=2)
             for idx in mapping['dischargePressures']:
                 ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=headers[idx], color='navy', linestyle='-')
+                        label=f"{headers[idx]} (Pressure)", color='navy', linestyle='-', linewidth=2)
             
-            # Plot temperatures on primary y-axis
+            # Plot temperatures on primary y-axis - ensure suction temps are included
+            temp_plotted = False
             for idx in mapping['suctionTemps']:
                 ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=headers[idx], color='red', linestyle='--')
+                        label=f"{headers[idx]} (Temperature)", color='red', linestyle='--', linewidth=2, marker='o', markersize=3)
+                temp_plotted = True
             for idx in mapping['supplyAirTemps']:
                 ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=headers[idx], color='orange', linestyle='--')
+                        label=f"{headers[idx]} (Temperature)", color='orange', linestyle='--', linewidth=2, marker='s', markersize=3)
+                temp_plotted = True
             
-            ax1.set_ylabel("Temperature (°F)", color='red')
-            ax2.set_ylabel("Pressure (PSI)", color='blue')
-            ax1.set_xlabel("Date")
+            # If no temperature data was found, look for any column with 'temp' in the name
+            if not temp_plotted:
+                for idx, header in enumerate(headers):
+                    if 'temp' in header.lower():
+                        ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
+                                label=f"{header} (Temperature)", color='red', linestyle='--', linewidth=2, marker='o', markersize=3)
+                        temp_plotted = True
+            
+            ax1.set_ylabel("Temperature (°F)", color='red', fontsize=12, fontweight='bold')
+            ax2.set_ylabel("Pressure (PSI)", color='blue', fontsize=12, fontweight='bold')
+            ax1.set_xlabel("Date", fontsize=12, fontweight='bold')
             ax1.tick_params(axis='y', labelcolor='red')
             ax2.tick_params(axis='y', labelcolor='blue')
             
@@ -215,31 +316,109 @@ if uploaded_file is not None:
             # Add legends
             lines1, labels1 = ax1.get_legend_handles_labels()
             lines2, labels2 = ax2.get_legend_handles_labels()
-            ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
+            if lines1 or lines2:
+                ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
             
+            plt.title(f"HVAC System Performance - {project_title}", fontsize=14, fontweight='bold')
             plt.tight_layout()
             st.pyplot(fig)
 
-        # Download report
-        report_lines = [f"HVAC Diagnostic Report - {project_title}", "="*50, "", "DATA ANALYSIS FINDINGS:", ""]
+        # Generate relevant diagnostic reference based on detected issues
+        if issues:
+            st.subheader("Relevant Diagnostic Reference")
+            st.markdown("*Based on issues detected in your system data*")
+            
+            diagnostic_ref = generate_diagnostic_reference(issues)
+            
+            for category, problems in diagnostic_ref.items():
+                st.markdown(f"### 🔧 **{category}**")
+                
+                for problem_name, details in problems.items():
+                    with st.expander(problem_name):
+                        st.markdown(f"**Symptoms:** {details['symptoms']}")
+                        st.markdown(f"**Causes:** {details['causes']}")
+                        st.markdown("**Diagnostic Steps:**")
+                        for step in details['diagnostics']:
+                            st.markdown(f"• {step}")
+                        st.markdown("**Solutions:**")
+                        for solution in details['solutions']:
+                            st.markdown(f"• {solution}")
+
+        # Enhanced Download report with logo and title
+        report_lines = [
+            f"{project_title}",
+            "="*len(project_title),
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            ""
+        ]
+        
+        if logo_file:
+            logo_base64 = get_base64_image(logo_file)
+            if logo_base64:
+                report_lines.extend([
+                    f"Company Logo: [Base64 Encoded - {len(logo_base64)} characters]",
+                    ""
+                ])
+        
+        report_lines.extend([
+            "HVAC DIAGNOSTIC ANALYSIS REPORT",
+            "="*50,
+            "",
+            "SYSTEM DATA ANALYSIS FINDINGS:",
+            ""
+        ])
         
         if issues:
-            for issue in issues:
-                report_lines.extend([
-                    f"SEVERITY: {issue['severity'].upper()}",
-                    f"ISSUE: {issue['message']}",
-                    f"EXPLANATION: {issue['explanation']}",
-                    f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
-                ])
-                if "outlier_count" in issue:
-                    report_lines.append(f"AFFECTED READINGS: {issue['outlier_count']}")
-                report_lines.extend(["", "-"*40, ""])
+            high_issues = [i for i in issues if i['severity'] == 'high']
+            medium_issues = [i for i in issues if i['severity'] == 'medium']
+            low_issues = [i for i in issues if i['severity'] == 'low']
+            
+            if high_issues:
+                report_lines.extend(["HIGH PRIORITY ISSUES:", "-"*20])
+                for issue in high_issues:
+                    report_lines.extend([
+                        f"ISSUE: {issue['message']}",
+                        f"EXPLANATION: {issue['explanation']}",
+                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                        ""
+                    ])
+            
+            if medium_issues:
+                report_lines.extend(["MEDIUM PRIORITY ISSUES:", "-"*22])
+                for issue in medium_issues:
+                    report_lines.extend([
+                        f"ISSUE: {issue['message']}",
+                        f"EXPLANATION: {issue['explanation']}",
+                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                        ""
+                    ])
+            
+            if low_issues:
+                report_lines.extend(["LOW PRIORITY ISSUES:", "-"*19])
+                for issue in low_issues:
+                    report_lines.extend([
+                        f"ISSUE: {issue['message']}",
+                        f"EXPLANATION: {issue['explanation']}",
+                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                        ""
+                    ])
         else:
-            report_lines.append("No immediate HVAC issues detected in data analysis.")
+            report_lines.append("✅ No immediate HVAC issues detected in data analysis.")
+        
+        report_lines.extend([
+            "",
+            "="*50,
+            f"Report generated by {project_title} Analysis System",
+            f"For technical support, please contact your HVAC service provider."
+        ])
         
         report = "\n".join(report_lines)
-        st.download_button("Download Diagnostics Report", report, 
-                          file_name=f"hvac_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt")
+        st.download_button(
+            "📄 Download Comprehensive Diagnostics Report", 
+            report, 
+            file_name=f"{project_title.replace(' ', '_')}_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+            mime="text/plain"
+        )
 
     except Exception as e:
         st.error(f"Error processing file: {str(e)}")
@@ -247,270 +426,13 @@ if uploaded_file is not None:
 
 else:
     st.info("👆 Please upload a CSV file to begin HVAC data analysis")
-
-# --- HVAC Diagnostic Reference (Always visible) ---
-st.subheader("Comprehensive HVAC Diagnostic Reference")
-st.markdown("### 🔧 **Refrigeration System Issues**")
-
-with st.expander("Low Refrigerant Charge"):
+    st.markdown("### 📋 **Expected Data Format**")
     st.markdown("""
-    **Symptoms:** Low suction pressure, high superheat, poor cooling capacity
-    **Causes:** Refrigerant leaks, improper charging, system evacuation issues
-    **Diagnostic Steps:**
-    - Check superheat and subcooling values
-    - Perform leak detection with electronic detector or soap bubbles
-    - Verify refrigerant type and proper charging procedures
-    **Solutions:** Locate and repair leaks, properly evacuate and recharge system
+    Your CSV file should contain columns with names that include:
+    - **Date/Time** information (e.g., 'Date', 'Timestamp')
+    - **Suction Pressure** data (e.g., 'Suction Pressure', 'Suction PSI')
+    - **Discharge Pressure** data (e.g., 'Discharge Pressure', 'Head Pressure')
+    - **Temperature** readings (e.g., 'Suction Temp', 'Supply Air Temp', 'Discharge Temp')
+    
+    The system will automatically detect and analyze these parameters based on column names.
     """)
-
-with st.expander("Overcharged Refrigerant"):
-    st.markdown("""
-    **Symptoms:** High discharge pressure, low superheat, liquid slugging
-    **Causes:** Excessive refrigerant added, moisture in system, non-condensables
-    **Diagnostic Steps:**
-    - Check subcooling values (typically too low)
-    - Monitor compressor amp draw
-    - Check for liquid refrigerant at compressor suction
-    **Solutions:** Recover excess refrigerant, check for moisture and non-condensables
-    """)
-
-with st.expander("Compressor Failure"):
-    st.markdown("""
-    **Symptoms:** No cooling, unusual noises, high amp draw, tripped breakers
-    **Causes:** Electrical issues, mechanical wear, liquid slugging, overheating
-    **Diagnostic Steps:**
-    - Check compressor windings with ohmmeter
-    - Measure amp draw and compare to nameplate
-    - Check oil condition and level
-    - Test starting components (contactors, capacitors)
-    **Solutions:** Replace compressor, address root cause, check system cleanliness
-    """)
-
-st.markdown("### 🌡️ **Temperature Control Problems**")
-
-with st.expander("Inconsistent Temperature Control"):
-    st.markdown("""
-    **Symptoms:** Temperature swings, short cycling, uneven cooling/heating
-    **Causes:** Faulty thermostat, improper sensor placement, control calibration
-    **Diagnostic Steps:**
-    - Calibrate thermostat with accurate thermometer
-    - Check sensor location and wiring
-    - Verify control settings and deadband
-    **Solutions:** Replace or recalibrate thermostat, relocate sensors, adjust controls
-    """)
-
-with st.expander("Frozen Evaporator Coil"):
-    st.markdown("""
-    **Symptoms:** Reduced airflow, ice buildup, poor cooling performance
-    **Causes:** Dirty filters, low refrigerant, blocked airflow, defrost issues
-    **Diagnostic Steps:**
-    - Check air filter condition
-    - Measure airflow across coil
-    - Check refrigerant pressures and superheat
-    - Inspect defrost system operation
-    **Solutions:** Replace filters, clean coil, repair refrigerant leaks, fix defrost system
-    """)
-
-st.markdown("### 💨 **Airflow and Ventilation Issues**")
-
-with st.expander("Inadequate Airflow"):
-    st.markdown("""
-    **Symptoms:** Poor cooling/heating, high energy consumption, comfort complaints
-    **Causes:** Dirty filters, blocked ducts, fan problems, undersized ductwork
-    **Diagnostic Steps:**
-    - Measure static pressure across system
-    - Check filter condition and size
-    - Inspect ductwork for obstructions or damage
-    - Verify fan operation and belt condition
-    **Solutions:** Clean/replace filters, clear obstructions, repair ducts, adjust fan speed
-    """)
-
-with st.expander("Dirty Air Filters"):
-    st.markdown("""
-    **Symptoms:** Reduced airflow, increased energy usage, poor indoor air quality
-    **Causes:** Lack of maintenance, wrong filter type, excessive contaminants
-    **Diagnostic Steps:**
-    - Visual inspection of filter condition
-    - Measure pressure drop across filter
-    - Check filter size and MERV rating
-    **Solutions:** Establish regular filter replacement schedule, use appropriate filter type
-    """)
-
-with st.expander("Ductwork Problems"):
-    st.markdown("""
-    **Symptoms:** Uneven temperatures, high energy bills, excessive noise
-    **Causes:** Leaky ducts, poor insulation, improper sizing, crushed ducts
-    **Diagnostic Steps:**
-    - Perform duct blaster test for leakage
-    - Check insulation condition and R-value
-    - Measure airflow at registers
-    - Visual inspection for damage
-    **Solutions:** Seal duct leaks, add insulation, resize ducts, repair damage
-    """)
-
-st.markdown("### ⚡ **Electrical System Faults**")
-
-with st.expander("Electrical Control Failures"):
-    st.markdown("""
-    **Symptoms:** Unit won't start, intermittent operation, blown fuses
-    **Causes:** Faulty contactors, bad capacitors, loose connections, control board issues
-    **Diagnostic Steps:**
-    - Check voltage at all connection points
-    - Test contactors and relays
-    - Measure capacitor values
-    - Inspect control board for damage
-    **Solutions:** Replace faulty components, tighten connections, update control boards
-    """)
-
-with st.expander("Motor Problems"):
-    st.markdown("""
-    **Symptoms:** No fan operation, unusual noises, high amp draw, overheating
-    **Causes:** Bearing wear, winding failure, capacitor problems, mechanical binding
-    **Diagnostic Steps:**
-    - Check motor amp draw vs nameplate
-    - Test motor windings for continuity
-    - Check capacitor values
-    - Inspect for mechanical obstructions
-    **Solutions:** Replace motor, repair capacitors, lubricate bearings, clear obstructions
-    """)
-
-st.markdown("### 🏠 **System Design and Installation Issues**")
-
-with st.expander("Undersized Equipment"):
-    st.markdown("""
-    **Symptoms:** Cannot maintain setpoint, continuous operation, high energy bills
-    **Causes:** Incorrect load calculations, building modifications, extreme weather
-    **Diagnostic Steps:**
-    - Perform proper load calculation (Manual J)
-    - Monitor runtime and temperature differential
-    - Check equipment capacity vs actual load
-    **Solutions:** Upgrade equipment size, improve building envelope, add supplemental units
-    """)
-
-with st.expander("Oversized Equipment"):
-    st.markdown("""
-    **Symptoms:** Short cycling, poor humidity control, temperature swings
-    **Causes:** Incorrect sizing, overly conservative calculations
-    **Diagnostic Steps:**
-    - Monitor cycle times and frequency
-    - Check actual vs design loads
-    - Measure humidity levels
-    **Solutions:** Install variable capacity equipment, add staging controls, resize system
-    """)
-
-with st.expander("Poor System Balance"):
-    st.markdown("""
-    **Symptoms:** Hot/cold spots, varying airflow between rooms
-    **Causes:** Improper damper settings, poor duct design, missing balancing
-    **Diagnostic Steps:**
-    - Measure airflow at each register
-    - Check damper positions
-    - Verify duct sizing calculations
-    **Solutions:** Balance airflow, adjust dampers, install balancing dampers
-    """)
-
-st.markdown("### 🧼 **Maintenance-Related Problems**")
-
-with st.expander("Dirty Condenser Coil"):
-    st.markdown("""
-    **Symptoms:** High discharge pressure, reduced cooling capacity, high energy usage
-    **Causes:** Lack of maintenance, environmental contamination, poor location
-    **Diagnostic Steps:**
-    - Visual inspection of coil condition
-    - Check discharge pressure vs ambient temperature
-    - Measure amp draw of condensing unit
-    **Solutions:** Clean coil with appropriate methods, establish maintenance schedule
-    """)
-
-with st.expander("Dirty Evaporator Coil"):
-    st.markdown("""
-    **Symptoms:** Reduced airflow, ice formation, poor heat transfer
-    **Causes:** Poor filtration, lack of maintenance, biological growth
-    **Diagnostic Steps:**
-    - Visual inspection through access panels
-    - Check temperature split across coil
-    - Measure airflow and static pressure
-    **Solutions:** Clean coil professionally, improve filtration, treat for biologicals
-    """)
-
-with st.expander("Clogged Condensate Drain"):
-    st.markdown("""
-    **Symptoms:** Water leaks, high humidity, musty odors, water damage
-    **Causes:** Algae growth, debris buildup, improper slope, frozen traps
-    **Diagnostic Steps:**
-    - Check drain pan for standing water
-    - Test drain flow with water
-    - Inspect trap and drain line
-    **Solutions:** Clear blockages, install drain cleaners, improve drain slope
-    """)
-
-st.markdown("### 🔄 **Advanced System Issues**")
-
-with st.expander("Heat Recovery Problems"):
-    st.markdown("""
-    **Symptoms:** Inefficient operation, bypass issues, contamination
-    **Causes:** Heat exchanger fouling, damper problems, control failures
-    **Diagnostic Steps:**
-    - Check heat exchanger effectiveness
-    - Verify damper operation
-    - Monitor temperature differentials
-    **Solutions:** Clean heat exchangers, repair dampers, calibrate controls
-    """)
-
-with st.expander("Variable Frequency Drive (VFD) Issues"):
-    st.markdown("""
-    **Symptoms:** Erratic fan speeds, motor overheating, harmonic distortion
-    **Causes:** Parameter settings, electrical interference, heat buildup
-    **Diagnostic Steps:**
-    - Check VFD parameters and settings
-    - Monitor input/output voltages
-    - Check for electrical noise
-    **Solutions:** Reprogram VFD, add line reactors, improve ventilation
-    """)
-
-with st.expander("Building Automation System (BAS) Problems"):
-    st.markdown("""
-    **Symptoms:** Poor system coordination, inefficient operation, control conflicts
-    **Causes:** Programming errors, communication failures, sensor drift
-    **Diagnostic Steps:**
-    - Review control sequences
-    - Check communication networks
-    - Calibrate sensors and actuators
-    **Solutions:** Update programming, repair networks, replace faulty components
-    """)
-
-with st.expander("Zoning System Malfunctions"):
-    st.markdown("""
-    **Symptoms:** Uneven temperatures between zones, damper problems
-    **Causes:** Faulty zone dampers, control panel issues, sensor problems
-    **Diagnostic Steps:**
-    - Test zone damper operation
-    - Check zone control panel
-    - Verify temperature sensors
-    **Solutions:** Replace dampers, repair control panels, calibrate sensors
-    """)
-
-with st.expander("Indoor Air Quality Issues"):
-    st.markdown("""
-    **Symptoms:** Occupant complaints, odors, health issues, poor ventilation
-    **Causes:** Inadequate ventilation, contamination sources, filtration problems
-    **Diagnostic Steps:**
-    - Measure ventilation rates
-    - Test for common contaminants
-    - Check filtration effectiveness
-    **Solutions:** Increase ventilation, eliminate sources, upgrade filtration
-    """)
-
-with st.expander("Refrigerant Line Issues"):
-    st.markdown("""
-    **Symptoms:** Pressure drops, oil logging, capacity loss
-    **Causes:** Improper sizing, installation errors, insulation problems
-    **Diagnostic Steps:**
-    - Check line sizing calculations
-    - Inspect insulation condition
-    - Monitor pressure drops
-    **Solutions:** Resize lines, repair insulation, add oil separators
-    """)
-
-st.markdown("---")
-st.markdown("**💡 Pro Tip:** Always start diagnostics with basic checks (power, filters, settings) before moving to complex system analysis. Document all findings and maintain detailed service records for trend analysis.")
