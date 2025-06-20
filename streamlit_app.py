@@ -69,7 +69,7 @@ def parse_headers_enhanced(headers):
     
     return mapping
 
-andef format_date_enhanced(date_str, time_str=None):
+def format_date_enhanced(date_str, time_str=None):
     """Enhanced date formatting that can handle date and time separately"""
     try:
         if time_str is not None:
