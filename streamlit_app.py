@@ -550,7 +550,7 @@ if uploaded_file is not None:
         else:
             st.success("✅ No immediate HVAC issues detected in the data analysis.")
 
-        # NOT UPDATED Enhanced Time-series plot
+      # Enhanced Time-series plot with multiple subplots
         if mapping['date'] is not None:
             # Create datetime column
             if mapping['time'] is not None:
@@ -566,7 +566,7 @@ if uploaded_file is not None:
                 # Create multiple plots for different parameter types
                 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
                 
-                # Plot 1: Pressures
+                # Plot 1: System Pressures
                 if mapping['suctionPressures'] or mapping['dischargePressures']:
                     for idx in mapping['suctionPressures']:
                         ax1.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
@@ -578,60 +578,135 @@ if uploaded_file is not None:
                     ax1.set_ylabel("Pressure (PSI)", fontweight='bold')
                     ax1.legend()
                     ax1.grid(True, alpha=0.3)
-
-        # Time-series plot with improved suction temperature handling
-        if mapping['date'] is not None:
-            df['__date__'] = df.iloc[:, mapping['date']].apply(format_date_enhanced)
-            df = df[df['__date__'].notna()]
-            st.subheader("Time-Series Analysis")
-            fig, ax1 = plt.subplots(figsize=(12, 6))
-            ax2 = ax1.twinx()
-            
-            # Plot pressures on secondary y-axis
-            for idx in mapping['suctionPressures']:
-                ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=f"{headers[idx]} (Pressure)", color='blue', linestyle='-', linewidth=2)
-            for idx in mapping['dischargePressures']:
-                ax2.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=f"{headers[idx]} (Pressure)", color='navy', linestyle='-', linewidth=2)
-            
-            # Plot temperatures on primary y-axis - ensure suction temps are included
-            temp_plotted = False
-            for idx in mapping['suctionTemps']:
-                ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=f"{headers[idx]} (Temperature)", color='red', linestyle='--', linewidth=2, marker='o', markersize=3)
-                temp_plotted = True
-            for idx in mapping['supplyAirTemps']:
-                ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                        label=f"{headers[idx]} (Temperature)", color='orange', linestyle='--', linewidth=2, marker='s', markersize=3)
-                temp_plotted = True
-            
-            # If no temperature data was found, look for any column with 'temp' in the name
-            if not temp_plotted:
-                for idx, header in enumerate(headers):
-                    if 'temp' in header.lower():
-                        ax1.plot(df['__date__'], pd.to_numeric(df.iloc[:, idx], errors='coerce'), 
-                                label=f"{header} (Temperature)", color='red', linestyle='--', linewidth=2, marker='o', markersize=3)
-                        temp_plotted = True
-            
-            ax1.set_ylabel("Temperature (°F)", color='red', fontsize=12, fontweight='bold')
-            ax2.set_ylabel("Pressure (PSI)", color='blue', fontsize=12, fontweight='bold')
-            ax1.set_xlabel("Date", fontsize=12, fontweight='bold')
-            ax1.tick_params(axis='y', labelcolor='red')
-            ax2.tick_params(axis='y', labelcolor='blue')
-            
-            # Format x-axis dates
-            fig.autofmt_xdate(rotation=45)
-            
-            # Add legends
-            lines1, labels1 = ax1.get_legend_handles_labels()
-            lines2, labels2 = ax2.get_legend_handles_labels()
-            if lines1 or lines2:
-                ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
-            
-            plt.title(f"HVAC System Performance - {project_title}", fontsize=14, fontweight='bold')
-            plt.tight_layout()
-            st.pyplot(fig)
+                    ax1.tick_params(axis='x', rotation=45)
+                else:
+                    ax1.text(0.5, 0.5, 'No Pressure Data Available', ha='center', va='center', transform=ax1.transAxes)
+                    ax1.set_title("System Pressures", fontweight='bold')
+                
+                # Plot 2: System Temperatures
+                if mapping['suctionTemps'] or mapping['supplyAirTemps'] or mapping['dischargeTemps']:
+                    for idx in mapping['suctionTemps']:
+                        ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='red', linewidth=2, marker='o', markersize=2)
+                    for idx in mapping['supplyAirTemps']:
+                        ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='orange', linewidth=2, marker='s', markersize=2)
+                    for idx in mapping['dischargeTemps']:
+                        ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='darkred', linewidth=2, marker='^', markersize=2)
+                    ax2.set_title("System Temperatures", fontweight='bold')
+                    ax2.set_ylabel("Temperature (°F)", fontweight='bold')
+                    ax2.legend()
+                    ax2.grid(True, alpha=0.3)
+                    ax2.tick_params(axis='x', rotation=45)
+                else:
+                    # Look for any temperature columns that weren't specifically categorized
+                    temp_found = False
+                    for idx, header in enumerate(headers):
+                        if 'temp' in header.lower():
+                            ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                    label=f"{header}", color='red', linewidth=2, marker='o', markersize=2)
+                            temp_found = True
+                    
+                    if temp_found:
+                        ax2.set_title("System Temperatures", fontweight='bold')
+                        ax2.set_ylabel("Temperature (°F)", fontweight='bold')
+                        ax2.legend()
+                        ax2.grid(True, alpha=0.3)
+                        ax2.tick_params(axis='x', rotation=45)
+                    else:
+                        ax2.text(0.5, 0.5, 'No Temperature Data Available', ha='center', va='center', transform=ax2.transAxes)
+                        ax2.set_title("System Temperatures", fontweight='bold')
+                
+                # Plot 3: Outdoor Air Temperature
+                if mapping['outdoorAirTemps']:
+                    for idx in mapping['outdoorAirTemps']:
+                        ax3.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='green', linewidth=2, marker='d', markersize=2)
+                    ax3.set_title("Outdoor Air Temperature", fontweight='bold')
+                    ax3.set_ylabel("Temperature (°F)", fontweight='bold')
+                    ax3.legend()
+                    ax3.grid(True, alpha=0.3)
+                    ax3.tick_params(axis='x', rotation=45)
+                else:
+                    ax3.text(0.5, 0.5, 'No Outdoor Air Temperature Data', ha='center', va='center', transform=ax3.transAxes)
+                    ax3.set_title("Outdoor Air Temperature", fontweight='bold')
+                
+                # Plot 4: Setpoints
+                if mapping['coolingSetpoints'] or mapping['heatingSetpoints']:
+                    for idx in mapping['coolingSetpoints']:
+                        ax4.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='cyan', linewidth=2, marker='v', markersize=2)
+                    for idx in mapping['heatingSetpoints']:
+                        ax4.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='magenta', linewidth=2, marker='*', markersize=3)
+                    ax4.set_title("Temperature Setpoints", fontweight='bold')
+                    ax4.set_ylabel("Temperature (°F)", fontweight='bold')
+                    ax4.legend()
+                    ax4.grid(True, alpha=0.3)
+                    ax4.tick_params(axis='x', rotation=45)
+                else:
+                    ax4.text(0.5, 0.5, 'No Setpoint Data Available', ha='center', va='center', transform=ax4.transAxes)
+                    ax4.set_title("Temperature Setpoints", fontweight='bold')
+                
+                # Format dates on all subplots
+                for ax in [ax1, ax2, ax3, ax4]:
+                    ax.tick_params(axis='x', rotation=45)
+                
+                plt.suptitle(f"HVAC System Performance Analysis - {project_title}", fontsize=16, fontweight='bold')
+                plt.tight_layout()
+                st.pyplot(fig)
+                
+                # Additional simplified overview plot
+                st.subheader("📊 System Overview (Dual-Axis)")
+                fig2, ax_temp = plt.subplots(figsize=(14, 8))
+                ax_press = ax_temp.twinx()
+                
+                # Plot key temperatures on primary axis
+                temp_plotted = False
+                for idx in mapping['suctionTemps']:
+                    ax_temp.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='red', linewidth=2, marker='o', markersize=3)
+                    temp_plotted = True
+                for idx in mapping['supplyAirTemps']:
+                    ax_temp.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='orange', linewidth=2, marker='s', markersize=3)
+                    temp_plotted = True
+                
+                # If no specific temperature data found, look for any temperature columns
+                if not temp_plotted:
+                    for idx, header in enumerate(headers):
+                        if 'temp' in header.lower():
+                            ax_temp.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                        label=f"{header}", color='red', linewidth=2, marker='o', markersize=3)
+                            temp_plotted = True
+                
+                # Plot pressures on secondary axis
+                for idx in mapping['suctionPressures']:
+                    ax_press.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                 label=f"{headers[idx]}", color='blue', linewidth=2, linestyle='--')
+                for idx in mapping['dischargePressures']:
+                    ax_press.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                 label=f"{headers[idx]}", color='navy', linewidth=2, linestyle='--')
+                
+                # Formatting
+                ax_temp.set_ylabel("Temperature (°F)", color='red', fontsize=12, fontweight='bold')
+                ax_press.set_ylabel("Pressure (PSI)", color='blue', fontsize=12, fontweight='bold')
+                ax_temp.set_xlabel("Date/Time", fontsize=12, fontweight='bold')
+                ax_temp.tick_params(axis='y', labelcolor='red')
+                ax_press.tick_params(axis='y', labelcolor='blue')
+                
+                # Combine legends
+                lines1, labels1 = ax_temp.get_legend_handles_labels()
+                lines2, labels2 = ax_press.get_legend_handles_labels()
+                if lines1 or lines2:
+                    ax_temp.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
+                
+                ax_temp.grid(True, alpha=0.3)
+                plt.title(f"HVAC System Performance Overview - {project_title}", fontsize=14, fontweight='bold')
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                st.pyplot(fig2)
 
         # Generate relevant diagnostic reference based on detected issues
         if issues:
