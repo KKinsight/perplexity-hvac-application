@@ -12,36 +12,77 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 
-# --- Helper Functions (Define before use) ---
-def parse_headers(headers):
+# --- Enhanced Helper Functions ---
+def parse_headers_enhanced(headers):
+    """Enhanced header parsing to handle multiple CSV formats"""
     mapping = {
         'suctionPressures': [],
         'dischargePressures': [],
         'suctionTemps': [],
         'supplyAirTemps': [],
-        'date': None
+        'dischargeTemps': [],
+        'outdoorAirTemps': [],
+        'coolingSetpoints': [],
+        'heatingSetpoints': [],
+        'date': None,
+        'time': None
     }
+    
     for i, h in enumerate(headers):
-        lower = h.lower()
-        if "suction" in lower and "pressure" in lower:
-            mapping['suctionPressures'].append(i)
-        elif "discharge" in lower and "pressure" in lower:
-            mapping['dischargePressures'].append(i)
-        elif "suction" in lower and "temp" in lower:
-            mapping['suctionTemps'].append(i)
-        elif ("supply" in lower or "discharge" in lower) and "temp" in lower:
-            mapping['supplyAirTemps'].append(i)
-        elif "date" in lower and mapping['date'] is None:
+        h_clean = str(h).strip()
+        lower = h_clean.lower()
+        
+        # Date and Time detection
+        if any(keyword in lower for keyword in ['date']) and mapping['date'] is None:
             mapping['date'] = i
+        elif any(keyword in lower for keyword in ['time']) and mapping['time'] is None:
+            mapping['time'] = i
+        
+        # Enhanced pressure detection
+        elif any(keyword in lower for keyword in ['sucpr', 'suc pr', 'suction pr', 'suction_pr']) or \
+             (('suc' in lower or 'suction' in lower) and ('pr' in lower or 'pressure' in lower)):
+            mapping['suctionPressures'].append(i)
+        
+        elif any(keyword in lower for keyword in ['dischg', 'dis chg', 'discharge pr', 'head pr', 'headpr']) or \
+             (('discharge' in lower or 'head' in lower) and ('pr' in lower or 'pressure' in lower)):
+            mapping['dischargePressures'].append(i)
+        
+        # Enhanced temperature detection
+        elif any(keyword in lower for keyword in ['suctmp', 'suc tmp', 'suction tmp', 'suction_tmp', 'suction temp']):
+            mapping['suctionTemps'].append(i)
+        
+        elif any(keyword in lower for keyword in ['sat ', 'supply air', 'supply_air', 'discharge temp']):
+            mapping['supplyAirTemps'].append(i)
+        
+        elif any(keyword in lower for keyword in ['dischg', 'dis chg', 'discharge']) and 'temp' in lower:
+            mapping['dischargeTemps'].append(i)
+        
+        elif any(keyword in lower for keyword in ['oat', 'outdoor', 'outside']) and ('temp' in lower or 'air' in lower):
+            mapping['outdoorAirTemps'].append(i)
+        
+        # Setpoint detection
+        elif any(keyword in lower for keyword in ['csp', 'cool', 'cooling']) and ('sp' in lower or 'setpoint' in lower):
+            mapping['coolingSetpoints'].append(i)
+        
+        elif any(keyword in lower for keyword in ['hsp', 'heat', 'heating']) and ('sp' in lower or 'setpoint' in lower):
+            mapping['heatingSetpoints'].append(i)
+    
     return mapping
 
-def format_date(date_str):
+def format_date_enhanced(date_str, time_str=None):
+    """Enhanced date formatting that can handle date and time separately"""
     try:
-        return pd.to_datetime(date_str)
+        if time_str is not None:
+            # Combine date and time
+            combined = f"{date_str} {time_str}"
+            return pd.to_datetime(combined)
+        else:
+            return pd.to_datetime(date_str)
     except:
         return pd.NaT
 
-def analyze_hvac_data(data, headers):
+def analyze_hvac_data_enhanced(data, headers, mapping):
+    """Enhanced HVAC analysis with improved detection logic"""
     issues = []
     
     # HVAC-specific analysis based on actual data patterns
@@ -50,99 +91,114 @@ def analyze_hvac_data(data, headers):
         if len(col_data) == 0:
             continue
             
-        header_lower = header.lower()
+        header_lower = str(header).lower()
         
-        # Suction Pressure Analysis
-        if "suction" in header_lower and "pressure" in header_lower:
-            if col_data.mean() < 60:  # Low suction pressure (typical range 60-80 psi for R-410A)
+        # Suction Pressure Analysis (Enhanced)
+        if colIdx in mapping['suctionPressures']:
+            avg_pressure = col_data.mean()
+            if avg_pressure < 60:  # Low suction pressure
                 issues.append({
                     "severity": "high",
-                    "message": f"Low suction pressure detected in {header}",
+                    "message": f"Low suction pressure detected in {header} (Avg: {avg_pressure:.1f} PSI)",
                     "explanation": "Low suction pressure typically indicates refrigerant undercharge, restriction in liquid line, or evaporator issues.",
                     "suggestions": ["Check for refrigerant leaks", "Verify proper refrigerant charge", "Inspect liquid line for restrictions", "Check evaporator coil condition"],
                     "issue_type": "refrigerant_system"
                 })
-            elif col_data.mean() > 90:  # High suction pressure
+            elif avg_pressure > 90:  # High suction pressure
                 issues.append({
                     "severity": "medium",
-                    "message": f"High suction pressure detected in {header}",
+                    "message": f"High suction pressure detected in {header} (Avg: {avg_pressure:.1f} PSI)",
                     "explanation": "High suction pressure may indicate overcharge, compressor issues, or excessive heat load.",
                     "suggestions": ["Check refrigerant charge level", "Inspect compressor operation", "Verify cooling load calculations", "Check for non-condensables"],
                     "issue_type": "refrigerant_system"
                 })
         
-        # Discharge Pressure Analysis  
-        elif "discharge" in header_lower and "pressure" in header_lower:
-            if col_data.mean() > 400:  # High discharge pressure (varies by refrigerant)
+        # Discharge Pressure Analysis (Enhanced)
+        elif colIdx in mapping['dischargePressures']:
+            avg_pressure = col_data.mean()
+            if avg_pressure > 400:  # High discharge pressure
                 issues.append({
                     "severity": "high", 
-                    "message": f"High discharge pressure detected in {header}",
+                    "message": f"High discharge pressure detected in {header} (Avg: {avg_pressure:.1f} PSI)",
                     "explanation": "High discharge pressure indicates condenser problems, overcharge, or airflow restrictions.",
                     "suggestions": ["Clean condenser coil", "Check condenser fan operation", "Verify proper airflow", "Check for overcharge"],
                     "issue_type": "condenser_system"
                 })
-            elif col_data.mean() < 200:  # Low discharge pressure
+            elif avg_pressure < 150:  # Low discharge pressure
                 issues.append({
                     "severity": "medium",
-                    "message": f"Low discharge pressure detected in {header}",
+                    "message": f"Low discharge pressure detected in {header} (Avg: {avg_pressure:.1f} PSI)",
                     "explanation": "Low discharge pressure may indicate undercharge, compressor wear, or valve problems.",
                     "suggestions": ["Check refrigerant charge", "Test compressor valves", "Inspect for internal leaks", "Verify compressor operation"],
                     "issue_type": "compressor_system"
                 })
         
-        # Temperature Analysis
-        elif "temp" in header_lower:
+        # Enhanced Temperature Analysis
+        elif colIdx in mapping['suctionTemps']:
+            avg_temp = col_data.mean()
+            if avg_temp > 65:  # High suction temp
+                issues.append({
+                    "severity": "medium",
+                    "message": f"High suction temperature in {header} (Avg: {avg_temp:.1f}°F)",
+                    "explanation": "High suction temperature indicates low refrigerant charge or expansion valve problems.",
+                    "suggestions": ["Check superheat settings", "Verify refrigerant charge", "Inspect expansion valve", "Check for restrictions"],
+                    "issue_type": "refrigerant_system"
+                })
+            elif avg_temp < 35:  # Risk of freezing
+                issues.append({
+                    "severity": "high",
+                    "message": f"Low suction temperature risk in {header} (Avg: {avg_temp:.1f}°F)",
+                    "explanation": "Very low suction temperature risks liquid refrigerant returning to compressor.",
+                    "suggestions": ["Check superheat immediately", "Verify proper airflow", "Inspect expansion valve", "Check for flooding"],
+                    "issue_type": "refrigerant_system"
+                })
+        
+        elif colIdx in mapping['supplyAirTemps'] or colIdx in mapping['dischargeTemps']:
+            avg_temp = col_data.mean()
+            if avg_temp > 120:  # High discharge temp
+                issues.append({
+                    "severity": "high",
+                    "message": f"High discharge temperature in {header} (Avg: {avg_temp:.1f}°F)",
+                    "explanation": "High discharge temperature indicates compressor stress, poor heat rejection, or overcharge.",
+                    "suggestions": ["Check condenser operation", "Verify proper airflow", "Check refrigerant charge", "Inspect compressor condition"],
+                    "issue_type": "compressor_system"
+                })
+            elif avg_temp < 50:  # Very low supply air temp
+                issues.append({
+                    "severity": "medium",
+                    "message": f"Very low supply air temperature in {header} (Avg: {avg_temp:.1f}°F)",
+                    "explanation": "Extremely low supply air temperature may indicate overcooling or control issues.",
+                    "suggestions": ["Check thermostat settings", "Verify cooling load", "Inspect damper operation", "Check for overcooling"],
+                    "issue_type": "control_system"
+                })
+        
+        # Temperature stability analysis for all temperature readings
+        if colIdx in (mapping['suctionTemps'] + mapping['supplyAirTemps'] + mapping['dischargeTemps'] + mapping['outdoorAirTemps']):
             temp_range = col_data.max() - col_data.min()
-            if "suction" in header_lower:
-                if col_data.mean() > 60:  # High suction temp
-                    issues.append({
-                        "severity": "medium",
-                        "message": f"High suction temperature in {header}",
-                        "explanation": "High suction temperature indicates low refrigerant charge or expansion valve problems.",
-                        "suggestions": ["Check superheat settings", "Verify refrigerant charge", "Inspect expansion valve", "Check for restrictions"],
-                        "issue_type": "refrigerant_system"
-                    })
-                elif col_data.mean() < 32:  # Risk of freezing
-                    issues.append({
-                        "severity": "high",
-                        "message": f"Low suction temperature risk in {header}",
-                        "explanation": "Very low suction temperature risks liquid refrigerant returning to compressor.",
-                        "suggestions": ["Check superheat immediately", "Verify proper airflow", "Inspect expansion valve", "Check for flooding"],
-                        "issue_type": "refrigerant_system"
-                    })
-            elif "supply" in header_lower or "discharge" in header_lower:
-                if col_data.mean() > 120:  # High discharge temp
-                    issues.append({
-                        "severity": "high",
-                        "message": f"High discharge temperature in {header}",
-                        "explanation": "High discharge temperature indicates compressor stress, poor heat rejection, or overcharge.",
-                        "suggestions": ["Check condenser operation", "Verify proper airflow", "Check refrigerant charge", "Inspect compressor condition"],
-                        "issue_type": "compressor_system"
-                    })
-            
-            # Temperature stability analysis
-            if temp_range > 20:  # High temperature variation
+            if temp_range > 25:  # High temperature variation
                 issues.append({
                     "severity": "medium", 
-                    "message": f"High temperature variation in {header}",
+                    "message": f"High temperature variation in {header} (Range: {temp_range:.1f}°F)",
                     "explanation": "Large temperature swings indicate cycling issues, control problems, or system instability.",
                     "suggestions": ["Check thermostat operation", "Verify control settings", "Inspect for short cycling", "Check system sizing"],
                     "issue_type": "control_system"
                 })
         
         # General outlier detection with HVAC context
-        q1, q3 = np.percentile(col_data, [25, 75])
-        iqr = q3 - q1
-        outliers = col_data[(col_data < q1 - 1.5*iqr) | (col_data > q3 + 1.5*iqr)]
-        if len(outliers) > len(col_data) * 0.1:  # More than 10% outliers
-            issues.append({
-                "severity": "medium",
-                "message": f"Frequent unusual readings in {header}",
-                "explanation": "Multiple abnormal readings suggest equipment malfunction, sensor drift, or operating condition changes.",
-                "suggestions": ["Calibrate sensors", "Check equipment operation during outlier periods", "Review maintenance logs", "Monitor for patterns"],
-                "outlier_count": len(outliers),
-                "issue_type": "sensor_system"
-            })
+        if len(col_data) > 5:  # Only analyze if we have enough data points
+            q1, q3 = np.percentile(col_data, [25, 75])
+            iqr = q3 - q1
+            if iqr > 0:  # Avoid division by zero
+                outliers = col_data[(col_data < q1 - 1.5*iqr) | (col_data > q3 + 1.5*iqr)]
+                if len(outliers) > len(col_data) * 0.15:  # More than 15% outliers
+                    issues.append({
+                        "severity": "medium",
+                        "message": f"Frequent unusual readings in {header}",
+                        "explanation": "Multiple abnormal readings suggest equipment malfunction, sensor drift, or operating condition changes.",
+                        "suggestions": ["Calibrate sensors", "Check equipment operation during outlier periods", "Review maintenance logs", "Monitor for patterns"],
+                        "outlier_count": len(outliers),
+                        "issue_type": "sensor_system"
+                    })
     
     return issues
 
@@ -396,6 +452,9 @@ def generate_pdf_report(project_title, logo_file, issues, df_summary=None):
     buffer.seek(0)
     return buffer
 
+# --- Streamlit App ---
+st.set_page_config(page_title="Enhanced HVAC Data Analysis", layout="wide")
+
 # --- Sidebar Configuration ---
 st.sidebar.title("Configuration")
 logo_file = st.sidebar.file_uploader("Upload Logo", type=["png", "jpg", "jpeg"])
@@ -407,7 +466,6 @@ if logo_file:
 # Title and project input
 project_title = st.text_input("Enter Project Title", "HVAC Diagnostic Report")
 st.title(project_title)
-page_title = st.sidebar.text_input("Webpage Title", "Air Carolinas Data Analysis")
 
 # --- File Upload ---
 uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
@@ -418,15 +476,62 @@ if uploaded_file is not None:
         content = uploaded_file.read().decode("utf-8")
         df = pd.read_csv(StringIO(content))
         headers = df.columns.tolist()
-        mapping = parse_headers(headers)
-        issues = analyze_hvac_data(df, headers)
+        
+        # Use enhanced header parsing
+        mapping = parse_headers_enhanced(headers)
+        
+        # Debug: Show detected columns
+        st.sidebar.subheader("🔍 Detected Columns")
+        if mapping['suctionPressures']:
+            st.sidebar.write(f"**Suction Pressures:** {[headers[i] for i in mapping['suctionPressures']]}")
+        if mapping['dischargePressures']:
+            st.sidebar.write(f"**Discharge Pressures:** {[headers[i] for i in mapping['dischargePressures']]}")
+        if mapping['suctionTemps']:
+            st.sidebar.write(f"**Suction Temps:** {[headers[i] for i in mapping['suctionTemps']]}")
+        if mapping['supplyAirTemps']:
+            st.sidebar.write(f"**Supply Air Temps:** {[headers[i] for i in mapping['supplyAirTemps']]}")
+        if mapping['outdoorAirTemps']:
+            st.sidebar.write(f"**Outdoor Air Temps:** {[headers[i] for i in mapping['outdoorAirTemps']]}")
+        if mapping['date'] is not None:
+            st.sidebar.write(f"**Date Column:** {headers[mapping['date']]}")
+        if mapping['time'] is not None:
+            st.sidebar.write(f"**Time Column:** {headers[mapping['time']]}")
+        
+        # Analyze data with enhanced function
+        issues = analyze_hvac_data_enhanced(df, headers, mapping)
 
         # --- Main App Logic ---
-        st.subheader("Data Preview")
+        st.subheader("📊 Data Preview")
         st.dataframe(df.head(10))
+        
+        # Show basic statistics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Data Points", len(df))
+        with col2:
+            st.metric("Date Range", f"{len(df.index)} readings")
+        with col3:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            st.metric("Numeric Parameters", len(numeric_cols))
 
-        st.subheader("HVAC Diagnostic Analysis")
+        st.subheader("🔧 HVAC Diagnostic Analysis")
         if issues:
+            # Show summary counts
+            high_count = len([i for i in issues if i['severity'] == 'high'])
+            medium_count = len([i for i in issues if i['severity'] == 'medium'])
+            low_count = len([i for i in issues if i['severity'] == 'low'])
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("🔴 High Priority", high_count)
+            with col2:
+                st.metric("🟡 Medium Priority", medium_count)  
+            with col3:
+                st.metric("🔵 Low Priority", low_count)
+            
+            st.markdown("---")
+            
+            # Display issues
             for issue in issues:
                 if issue['severity'] == 'high':
                     st.error(f"🔴 **{issue['message']}**")
@@ -444,6 +549,35 @@ if uploaded_file is not None:
                 st.markdown("---")
         else:
             st.success("✅ No immediate HVAC issues detected in the data analysis.")
+
+        # Enhanced Time-series plot
+        if mapping['date'] is not None:
+            # Create datetime column
+            if mapping['time'] is not None:
+                df['__datetime__'] = df.apply(lambda row: format_date_enhanced(row.iloc[mapping['date']], row.iloc[mapping['time']]), axis=1)
+            else:
+                df['__datetime__'] = df.iloc[:, mapping['date']].apply(lambda x: format_date_enhanced(x))
+            
+            df_plot = df[df['__datetime__'].notna()].copy()
+            
+            if len(df_plot) > 0:
+                st.subheader("📈 Time-Series Analysis")
+                
+                # Create multiple plots for different parameter types
+                fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+                
+                # Plot 1: Pressures
+                if mapping['suctionPressures'] or mapping['dischargePressures']:
+                    for idx in mapping['suctionPressures']:
+                        ax1.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='blue', linewidth=2, marker='o', markersize=2)
+                    for idx in mapping['dischargePressures']:
+                        ax1.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
+                                label=f"{headers[idx]}", color='navy', linewidth=2, marker='s', markersize=2)
+                    ax1.set_title("System Pressures", fontweight='bold')
+                    ax1.set_ylabel("Pressure (PSI)", fontweight='bold')
+                    ax1.legend()
+                    ax1.grid(True, alpha=0.3)
 
         # Time-series plot with improved suction temperature handling
         if mapping['date'] is not None:
