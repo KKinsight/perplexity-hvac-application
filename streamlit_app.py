@@ -403,7 +403,7 @@ def generate_pdf_report(project_title, logo_file, issues, df_summary=None):
     
     # Add data summary if provided
     if df_summary is not None:
-        elements.append(Spacer(1, 20))
+        story.append(Spacer(1, 20))
         story.append(Paragraph("Data Summary Statistics", heading_style))
         
         # Create a simple table with basic stats
