@@ -550,45 +550,7 @@ if uploaded_file is not None:
         else:
             st.success("✅ No immediate HVAC issues detected in the data analysis.")
 
-    # Claude didn't finish
-   # Enhanced Time-series plot
-        if mapping['date'] is not None:
-            # Create datetime column
-            if mapping['time'] is not None:
-                df['__datetime__'] = df.apply(lambda row: format_date_enhanced(row.iloc[mapping['date']], row.iloc[mapping['time']]), axis=1)
-            else:
-                df['__datetime__'] = df.iloc[:, mapping['date']].apply(lambda x: format_date_enhanced(x))
-            
-            df_plot = df[df['__datetime__'].notna()].copy()
-            
-            if len(df_plot) > 0:
-                st.subheader("📈 Time-Series Analysis")
-                
-                # Create multiple plots for different parameter types
-                fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
-                
-                # Plot 1: Pressures
-                if mapping['suctionPressures'] or mapping['dischargePressures']:
-                    for idx in mapping['suctionPressures']:
-                        ax1.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                label=f"{headers[idx]}", color='blue', linewidth=2, marker='o', markersize=2)
-                    for idx in mapping['dischargePressures']:
-                        ax1.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                label=f"{headers[idx]}", color='navy', linewidth=2, marker='s', markersize=2)
-                    ax1.set_title("System Pressures", fontweight='bold')
-                    ax1.set_ylabel("Pressure (PSI)", fontweight='bold')
-                    ax1.legend()
-                    ax1.grid(True, alpha=0.3)
-                
-                # Plot 2: Temperatures
-                if mapping['suctionTemps'] or mapping['supplyAirTemps'] or mapping['dischargeTemps']:
-                    for idx in mapping['suctionTemps']:
-                        ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                label=f"{headers[idx]}", color='red', linewidth=2, marker='o', markersize=2)
-                    for idx in mapping['supplyAirTemps']:
-                        ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='co
-        
-        # AFTER CLAUDE Enhanced Time-series plot
+        # NOT UPDATED Enhanced Time-series plot
         if mapping['date'] is not None:
             # Create datetime column
             if mapping['time'] is not None:
