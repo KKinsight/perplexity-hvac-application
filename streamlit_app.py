@@ -69,7 +69,7 @@ def parse_headers_enhanced(headers):
     
     return mapping
 
-def format_date_enhanced(date_str, time_str=None):
+andef format_date_enhanced(date_str, time_str=None):
     """Enhanced date formatting that can handle date and time separately"""
     try:
         if time_str is not None:
@@ -581,7 +581,7 @@ if uploaded_file is not None:
 
         # Time-series plot with improved suction temperature handling
         if mapping['date'] is not None:
-            df['__date__'] = df.iloc[:, mapping['date']].apply(format_date)
+            df['__date__'] = df.iloc[:, mapping['date']].apply(format_date_enhanced)
             df = df[df['__date__'].notna()]
             st.subheader("Time-Series Analysis")
             fig, ax1 = plt.subplots(figsize=(12, 6))
