@@ -11,6 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+import altair as alt
 
 # --- Enhanced Helper Functions ---
 def parse_headers_enhanced(headers):
@@ -439,7 +440,7 @@ def generate_pdf_report(project_title, logo_file, issues, df_summary=None):
     story.append(Spacer(1, 30))
     story.append(Paragraph("Report Notes", heading_style))
     story.append(Paragraph("""
-    This automated diagnostic report is based on pattern analysis of HVAC system data. 
+    This automated diagnostic report is based on pattern analysis of Air Carolinas HVAC system data. 
     All recommendations should be verified by qualified HVAC technicians before implementation. 
     Regular maintenance and professional inspections are essential for optimal system performance.
     """, normal_style))
@@ -473,6 +474,8 @@ uploaded_files = st.file_uploader(
     type=['csv', 'xlsx', 'xls'],
     accept_multiple_files=True
 )
+all_dataframes = []
+file_metadata = []
 
 def read_csv_with_encoding(file_obj):
     encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
@@ -489,6 +492,30 @@ def read_csv_with_encoding(file_obj):
 
 if uploaded_files:
     for uploaded_file in uploaded_files:
+        if all_dataframes:
+            combined_df = pd.concat(all_dataframes, ignore_index=True)
+            
+        # Combine all issues into one list
+        combined_issues = []
+        for _, df in file_metadata:
+            headers = df.columns.tolist()
+            mapping = parse_headers_enhanced(headers)  # Your existing mapping logic
+            issues = analyze_hvac_data_enhanced(df, headers, mapping)
+            combined_issues.extend(issues)
+
+            # Generate summary stats from combined_df
+            df_summary = combined_df.describe()
+
+            if 'suction_pressure' in combined_df.columns:
+                st.subheader("📈 Suction Pressure Trends Across All Files")
+                chart = alt.Chart(combined_df.reset_index()).mark_line().encode(
+                    x='index',
+                    y='suction_pressure',
+                    color='source_file'
+                ).interactive()
+                st.altair_chart(chart, use_container_width=True)
+            st.subheader("📊 System-Wide Data Overview (All Files Combined)")
+            st.dataframe(combined_df.head())
         try:
             file_extension = uploaded_file.name.lower().split('.')[-1]
             if file_extension in ['xlsx', 'xls']:
@@ -501,6 +528,9 @@ if uploaded_files:
             else:
                 df, content = read_csv_with_encoding(uploaded_file)
                 st.success(f"✅ CSV file '{uploaded_file.name}' successfully read")
+
+            df['source_file'] = uploaded_file.name  # Optional: tag source
+            all_dataframes.append(df)
             
             headers = df.columns.tolist()
             mapping = parse_headers_enhanced(headers)
@@ -771,12 +801,16 @@ if uploaded_files:
                         # Generate PDF
                         pdf_buffer = generate_pdf_report(project_title, logo_file, issues, df)
                         
-                        # Offer download
+                        from datetime import datetime
+
+                        report_text = generate_report(combined_df)  # Define this helper function
+                        
                         st.download_button(
-                            label="⬇️ Download PDF Report",
-                            data=pdf_buffer.getvalue(),
-                            file_name=f"{project_title.replace(' ', '_')}_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                            mime="application/pdf"
+                            label="⬇️ Download Combined Report",
+                            data=report_text,
+                            file_name=f"HVAC_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                            mime="text/plain"
+                        )
                         )
                         st.success("✅ PDF report generated successfully!")
                         
@@ -855,7 +889,7 @@ if uploaded_files:
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
             st.info("Please make sure your CSV files are properly formatted and contain valid data.")
-
+    
 else:
     st.info("👆 Please upload CSV or XLSX files to begin HVAC data analysis")
     st.markdown("### 📋 **Expected Data Format**")
