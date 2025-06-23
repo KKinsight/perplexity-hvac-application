@@ -488,9 +488,9 @@ if uploaded_file is not None:
                         return pd.read_csv(StringIO(content)), content
                     except Exception:
                         continue
-            file_obj.seek(0)
-            content = file_obj.read().decode('utf-8', errors='replace')
-            return pd.read_csv(StringIO(content)), content
+                file_obj.seek(0)
+                content = file_obj.read().decode('utf-8', errors='replace')
+                return pd.read_csv(StringIO(content)), content
 
         df, content = read_csv_with_encoding(uploaded_file)
         st.success("✅ CSV file successfully read")
