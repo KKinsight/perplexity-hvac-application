@@ -480,14 +480,14 @@ if uploaded_file is not None:
             st.success("✅ Excel file successfully read")
         else:
             def read_csv_with_encoding(file_obj):
-            encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
-            for encoding in encodings_to_try:
-                try:
-                    file_obj.seek(0)
-                    content = file_obj.read().decode(encoding)
-                    return pd.read_csv(StringIO(content)), content
-                except Exception:
-                    continue
+                encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
+                for encoding in encodings_to_try:
+                    try:
+                        file_obj.seek(0)
+                        content = file_obj.read().decode(encoding)
+                        return pd.read_csv(StringIO(content)), content
+                    except Exception:
+                        continue
             file_obj.seek(0)
             content = file_obj.read().decode('utf-8', errors='replace')
             return pd.read_csv(StringIO(content)), content
