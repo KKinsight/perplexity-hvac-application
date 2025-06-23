@@ -497,9 +497,9 @@ if uploaded_file is not None:
 
         headers = df.columns.tolist()
 
-    except Exception as e:
-        st.error(f"❌ Error processing file: {str(e)}")
-        
+    except Exception as e:
+        st.error(f"❌ Error processing file: {str(e)}")
+
         # Use enhanced header parsing
         mapping = parse_headers_enhanced(headers)
         
