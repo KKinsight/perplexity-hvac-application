@@ -500,6 +500,18 @@ if uploaded_files:
         for _, df in file_metadata:
             headers = df.columns.tolist()
             mapping = parse_headers_enhanced(headers)  # Your existing mapping logic
+            try:
+                if mapping['date'] is not None and mapping['time'] is not None:
+                    date_col = headers[mapping['date']]
+                    time_col = headers[mapping['time']]
+                    df['datetime'] = pd.to_datetime(df[date_col] + ' ' + df[time_col])
+                elif mapping['date'] is not None:
+                    df['datetime'] = pd.to_datetime(df[headers[mapping['date']]])
+                elif mapping['time'] is not None:
+                    df['datetime'] = pd.to_datetime(df[headers[mapping['time']]])
+            except Exception as e:
+                st.warning(f"⚠️ Could not parse datetime: {e}")
+                
             issues = analyze_hvac_data_enhanced(df, headers, mapping)
             combined_issues.extend(issues)
 
@@ -508,11 +520,13 @@ if uploaded_files:
 
             if 'suction_pressure' in combined_df.columns:
                 st.subheader("📈 Suction Pressure Trends Across All Files")
-                chart = alt.Chart(combined_df.reset_index()).mark_line().encode(
-                    x='index',
+                
+                chart = alt.Chart(combined_df).mark_line().encode(
+                    x=alt.X('datetime:T', title='Time', axis=alt.Axis(format='%I %p')),  # 👈 Format here
                     y='suction_pressure',
                     color='source_file'
                 ).interactive()
+                
                 st.altair_chart(chart, use_container_width=True)
             st.subheader("📊 System-Wide Data Overview (All Files Combined)")
             st.dataframe(combined_df.head())
