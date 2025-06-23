@@ -495,7 +495,7 @@ if uploaded_file is not None:
         df, content = read_csv_with_encoding(uploaded_file)
         st.success("✅ CSV file successfully read")
 
-    headers = df.columns.tolist()
+        headers = df.columns.tolist()
 
     except Exception as e:
         st.error(f"❌ Error processing file: {str(e)}")
