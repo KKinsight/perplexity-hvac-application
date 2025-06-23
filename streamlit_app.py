@@ -476,27 +476,26 @@ if uploaded_file is not None:
         file_extension = uploaded_file.name.lower().split('.')[-1]
 
         if file_extension in ['xlsx', 'xls']:
-            df = pd.read_excel(uploaded_file, engine='openpyxl' if file_extension == 'xlsx' else 'xlrd')
-            st.success("✅ Excel file successfully read")
+            df = pd.read_excel(uploaded_file, engine='openpyxl' if file_extension == 'xlsx' else 'xlrd')
+            st.success("✅ Excel file successfully read")
         else:
-            def read_csv_with_encoding(file_obj):
-                encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
-                for encoding in encodings_to_try:
-                    try:
-                        file_obj.seek(0)
-                        content = file_obj.read().decode(encoding)
-                        return pd.read_csv(StringIO(content)), content
-                    except Exception:
-                        continue
-                file_obj.seek(0)
-                content = file_obj.read().decode('utf-8', errors='replace')
-                return pd.read_csv(StringIO(content)), content
+            def read_csv_with_encoding(file_obj):
+                encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
+                for encoding in encodings_to_try:
+                    try:
+                        file_obj.seek(0)
+                        content = file_obj.read().decode(encoding)
+                        return pd.read_csv(StringIO(content)), content
+                        except Exception:
+                            continue
+                file_obj.seek(0)
+                content = file_obj.read().decode('utf-8', errors='replace')
+            return pd.read_csv(StringIO(content)), content
 
-            df, content = read_csv_with_encoding(uploaded_file)
-            st.success("✅ CSV file successfully read")
+            df, content = read_csv_with_encoding(uploaded_file)
+            st.success("✅ CSV file successfully read")
 
-        headers = df.columns.tolist()
-        mapping = parse_headers_enhanced(headers)
+        headers = df.columns.tolist()
 
     except Exception as e:
         st.error(f"❌ Error processing file: {str(e)}")
