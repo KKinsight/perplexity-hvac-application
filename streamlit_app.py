@@ -473,14 +473,6 @@ uploaded_files = st.file_uploader(
     type=['csv', 'xlsx', 'xls'],
     accept_multiple_files=True
 )
-import pandas as pd
-from io import StringIO
-
-uploaded_files = st.file_uploader(
-    "Upload one or more CSV or Excel files",
-    type=["csv", "xlsx", "xls"],
-    accept_multiple_files=True
-)
 
 def read_csv_with_encoding(file_obj):
     encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
