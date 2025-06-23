@@ -92,6 +92,40 @@ def format_date_enhanced(date_str, time_str=None):
     except:
         return pd.NaT
 
+def check_comfort_conditions(df, headers, mapping):
+    results = []
+    # Relative Humidity
+    for idx in mapping.get('relativeHumidity', []):
+        col = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
+        if not col.empty:
+            over_60 = (col > 60).sum()
+            percent_over = (over_60 / len(col)) * 100
+            avg_rh = col.mean()
+            results.append({
+                "type": "Relative Humidity",
+                "column": headers[idx],
+                "average": avg_rh,
+                "percent_over": percent_over,
+                "compliant": percent_over == 0
+            })
+
+    # Indoor Temperature
+    for idx in mapping.get('indoorTemps', []):
+        col = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
+        if not col.empty:
+            below_70 = (col < 70).sum()
+            above_75 = (col > 75).sum()
+            percent_outside = ((below_70 + above_75) / len(col)) * 100
+            avg_temp = col.mean()
+            results.append({
+                "type": "Indoor Temperature",
+                "column": headers[idx],
+                "average": avg_temp,
+                "percent_outside": percent_outside,
+                "compliant": percent_outside == 0
+            })
+    return results
+
 def analyze_hvac_data_enhanced(data, headers, mapping):
     """Enhanced HVAC analysis with improved detection logic"""
     issues = []
@@ -615,6 +649,21 @@ if uploaded_files:
                     st.metric("🔵 Low Priority", low_count)
                 
                 st.markdown("---")
+
+                # Comfort Results
+                comfort_results = check_comfort_conditions(df, headers, mapping)
+
+                st.markdown("## 🏠 Indoor Comfort Check")
+                if comfort_results:
+                    for result in comfort_results:
+                        if result["type"] == "Relative Humidity":
+                            st.write(f"**{result['column']}** (Avg: {result['average']:.1f}%) - "
+                                     f"{'✅ Within ideal range (≤60%)' if result['compliant'] else f'⚠️ {result['percent_over']:.1f}% of values above 60%'}")
+                        elif result["type"] == "Indoor Temperature":
+                            st.write(f"**{result['column']}** (Avg: {result['average']:.1f}°F) - "
+                                     f"{'✅ Within ideal range (70–75°F)' if result['compliant'] else f'⚠️ {result['percent_outside']:.1f}% of values outside 70–75°F'}")
+                else:
+                    st.info("No relative humidity or indoor temperature columns detected in this file.")
                 
                 # Display issues
                 for issue in issues:
