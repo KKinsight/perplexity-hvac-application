@@ -84,11 +84,10 @@ def format_date_enhanced(date_str, time_str=None):
     """Enhanced date formatting that can handle date and time separately"""
     try:
         if time_str is not None:
-            # Combine date and time
             combined = f"{date_str} {time_str}"
-            return pd.to_datetime(combined)
+            return pd.to_datetime(combined, errors='coerce')
         else:
-            return pd.to_datetime(date_str)
+            return pd.to_datetime(date_str, errors='coerce')
     except:
         return pd.NaT
 
@@ -783,8 +782,11 @@ if uploaded_files:
                         ax4.text(0.5, 0.5, 'No Setpoint Data Available', ha='center', va='center', transform=ax4.transAxes)
                         ax4.set_title("Temperature Setpoints", fontweight='bold')
                     
-                    # Format dates on all subplots
+                    import matplotlib.dates as mdates
+                    
                     for ax in [ax1, ax2, ax3, ax4]:
+                        ax.xaxis.set_major_formatter(mdates.DateFormatter('%I %p'))  # e.g., 12 AM, 4 PM
+                        ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))   # every 4 hours
                         ax.tick_params(axis='x', rotation=45)
                     
                     plt.suptitle(f"HVAC System Performance Analysis - {project_title}", fontsize=16, fontweight='bold')
@@ -829,6 +831,10 @@ if uploaded_files:
                     ax_temp.set_xlabel("Date/Time", fontsize=12, fontweight='bold')
                     ax_temp.tick_params(axis='y', labelcolor='red')
                     ax_press.tick_params(axis='y', labelcolor='blue')
+                    import matplotlib.dates as mdates
+                    ax_temp.xaxis.set_major_formatter(mdates.DateFormatter('%I %p'))
+                    ax_temp.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+                    plt.xticks(rotation=45)
                     
                     # Combine legends
                     lines1, labels1 = ax_temp.get_legend_handles_labels()
