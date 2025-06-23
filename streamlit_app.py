@@ -468,57 +468,76 @@ project_title = st.text_input("Enter Project Title", "HVAC Diagnostic Report")
 st.title(project_title)
 
 # --- File Upload ---
-uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+uploaded_files = st.file_uploader(
+    "Upload one or more CSV or Excel files", 
+    type=['csv', 'xlsx', 'xls'],
+    accept_multiple_files=True
+)
+import pandas as pd
+from io import StringIO
 
+uploaded_files = st.file_uploader(
+    "Upload one or more CSV or Excel files",
+    type=["csv", "xlsx", "xls"],
+    accept_multiple_files=True
+)
 
-if uploaded_file is not None:
-    try:
-        file_extension = uploaded_file.name.lower().split('.')[-1]
+def read_csv_with_encoding(file_obj):
+    encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
+    for encoding in encodings_to_try:
+        try:
+            file_obj.seek(0)
+            content = file_obj.read().decode(encoding)
+            return pd.read_csv(StringIO(content)), content
+        except Exception:
+            continue
+    file_obj.seek(0)
+    content = file_obj.read().decode('utf-8', errors='replace')
+    return pd.read_csv(StringIO(content)), content
 
-        if file_extension in ['xlsx', 'xls']:
-            df = pd.read_excel(uploaded_file, engine='openpyxl' if file_extension == 'xlsx' else 'xlrd')
-            st.success("✅ Excel file successfully read")
-        else:
-            def read_csv_with_encoding(file_obj):
-                encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
-                for encoding in encodings_to_try:
-                    try:
-                        file_obj.seek(0)
-                        content = file_obj.read().decode(encoding)
-                        return pd.read_csv(StringIO(content)), content
-                    except Exception:
-                        continue
-                file_obj.seek(0)
-                content = file_obj.read().decode('utf-8', errors='replace')
-                return pd.read_csv(StringIO(content)), content
-
-        df, content = read_csv_with_encoding(uploaded_file)
-        st.success("✅ CSV file successfully read")
-
-        headers = df.columns.tolist()
-
-        # Use enhanced header parsing
-        mapping = parse_headers_enhanced(headers)
-        
-        # Debug: Show detected columns
-        st.sidebar.subheader("🔍 Detected Columns")
-        if mapping['suctionPressures']:
-            st.sidebar.write(f"**Suction Pressures:** {[headers[i] for i in mapping['suctionPressures']]}")
-        if mapping['dischargePressures']:
-            st.sidebar.write(f"**Discharge Pressures:** {[headers[i] for i in mapping['dischargePressures']]}")
-        if mapping['suctionTemps']:
-            st.sidebar.write(f"**Suction Temps:** {[headers[i] for i in mapping['suctionTemps']]}")
-        if mapping['supplyAirTemps']:
-            st.sidebar.write(f"**Supply Air Temps:** {[headers[i] for i in mapping['supplyAirTemps']]}")
-        if mapping['outdoorAirTemps']:
-            st.sidebar.write(f"**Outdoor Air Temps:** {[headers[i] for i in mapping['outdoorAirTemps']]}")
-        if mapping['date'] is not None:
-            st.sidebar.write(f"**Date Column:** {headers[mapping['date']]}")
-        if mapping['time'] is not None:
-            st.sidebar.write(f"**Time Column:** {headers[mapping['time']]}")
-        
-        # Analyze data with enhanced function
-        issues = analyze_hvac_data_enhanced(df, headers, mapping)
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        try:
+            file_extension = uploaded_file.name.lower().split('.')[-1]
+            if file_extension in ['xlsx', 'xls']:
+                df = pd.read_excel(
+                    uploaded_file,
+                    engine='openpyxl' if file_extension == 'xlsx' else 'xlrd'
+                )
+                st.success(f"✅ Excel file '{uploaded_file.name}' successfully read")
+                content = None
+            else:
+                df, content = read_csv_with_encoding(uploaded_file)
+                st.success(f"✅ CSV file '{uploaded_file.name}' successfully read")
+            
+            headers = df.columns.tolist()
+            mapping = parse_headers_enhanced(headers)
+            
+            # Show detected columns for each file
+            st.subheader(f"🔍 Detected Columns in {uploaded_file.name}")
+            if mapping['suctionPressures']:
+                st.write(f"**Suction Pressures:** {[headers[i] for i in mapping['suctionPressures']]}")
+            if mapping['dischargePressures']:
+                st.write(f"**Discharge Pressures:** {[headers[i] for i in mapping['dischargePressures']]}")
+            if mapping['suctionTemps']:
+                st.write(f"**Suction Temps:** {[headers[i] for i in mapping['suctionTemps']]}")
+            if mapping['supplyAirTemps']:
+                st.write(f"**Supply Air Temps:** {[headers[i] for i in mapping['supplyAirTemps']]}")
+            if mapping['outdoorAirTemps']:
+                st.write(f"**Outdoor Air Temps:** {[headers[i] for i in mapping['outdoorAirTemps']]}")
+            if mapping['date'] is not None:
+                st.write(f"**Date Column:** {headers[mapping['date']]}")
+            if mapping['time'] is not None:
+                st.write(f"**Time Column:** {headers[mapping['time']]}")
+            
+            # Analyze and display issues for each file
+            issues = analyze_hvac_data_enhanced(df, headers, mapping)
+            if issues:
+                st.write("Detected Issues:")
+                for issue in issues:
+                    st.write(f"- {issue['message']}")
+            else:
+                st.write("No major issues detected.")
 
         # --- Main App Logic ---
         st.subheader("📊 Data Preview")
