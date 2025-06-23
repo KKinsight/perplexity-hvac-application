@@ -478,7 +478,7 @@ if uploaded_file is not None:
         if file_extension in ['xlsx', 'xls']:
             df = pd.read_excel(uploaded_file, engine='openpyxl' if file_extension == 'xlsx' else 'xlrd')
             st.success("✅ Excel file successfully read")
-       else:
+        else:
             def read_csv_with_encoding(file_obj):
             encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
             for encoding in encodings_to_try:
