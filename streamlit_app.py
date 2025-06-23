@@ -472,6 +472,52 @@ uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
 
 if uploaded_file is not None:
     try:
+        # Determine file type and read accordingly
+        file_extension = uploaded_file.name.lower().split('.')[-1]
+        
+        if file_extension in ['xlsx', 'xls']:
+            # Handle Excel files
+            try:
+                df = pd.read_excel(uploaded_file, engine='openpyxl' if file_extension == 'xlsx' else 'xlrd')
+                st.success(f"✅ Excel file successfully read")
+                headers = df.columns.tolist()
+            except Exception as e:
+                st.error(f"Error reading Excel file: {str(e)}")
+                st.info("Make sure the Excel file is not corrupted and contains valid data in the first sheet.")
+                st.stop()
+        else:
+            # Handle CSV files with multiple encoding attempts
+            def read_csv_with_encoding(file_obj):
+                encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
+                
+                for encoding in encodings_to_try:
+                    try:
+                        file_obj.seek(0)  # Reset file pointer
+                        content = file_obj.read().decode(encoding)
+                        df = pd.read_csv(StringIO(content))
+                        st.success(f"✅ CSV file successfully read with {encoding} encoding")
+                        return df, content
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+                    except Exception as e:
+                        # Try next encoding if current one fails for other reasons
+                        continue
+                
+                # If all encodings fail, try reading as binary and handling errors
+                try:
+                    file_obj.seek(0)
+                    content = file_obj.read().decode('utf-8', errors='replace')
+                    df = pd.read_csv(StringIO(content))
+                    st.warning("⚠️ CSV file read with error handling - some characters may be replaced")
+                    return df, content
+                except Exception as e:
+                    raise Exception(f"Unable to read CSV file with any encoding method: {str(e)}")
+            
+            df, content = read_csv_with_encoding(uploaded_file)
+            headers = df.columns.tolist()
+
+if uploaded_file is not None:
+    try:
         # Read and process the uploaded file
         content = uploaded_file.read().decode("utf-8")
         df = pd.read_csv(StringIO(content))
