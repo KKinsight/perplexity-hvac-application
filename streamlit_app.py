@@ -825,7 +825,7 @@ if uploaded_files:
                             file_name=f"HVAC_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
                             mime="text/plain"
                         )
-                        )
+    
                         st.success("✅ PDF report generated successfully!")
                         
                     except Exception as e:
