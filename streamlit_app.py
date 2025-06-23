@@ -854,10 +854,10 @@ if uploaded_files:
 
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
-            st.info("Please make sure your CSV file is properly formatted and contains valid data.")
+            st.info("Please make sure your CSV files are properly formatted and contain valid data.")
 
 else:
-    st.info("👆 Please upload a CSV file to begin HVAC data analysis")
+    st.info("👆 Please upload CSV or XLSX files to begin HVAC data analysis")
     st.markdown("### 📋 **Expected Data Format**")
     st.markdown("""
     Your CSV file should contain columns with names that include:
