@@ -116,7 +116,7 @@ def check_comfort_conditions(df, headers, mapping):
     results = []
     
     # Check relative humidity
-    for idx in mapping['relativeHumidity']:
+    for idx in mapping.get('relativeHumidity', []):  # Use .get() for safety
         rh_data = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
         if len(rh_data) > 0:
             avg_rh = rh_data.mean()
@@ -125,40 +125,26 @@ def check_comfort_conditions(df, headers, mapping):
                 'type': 'Relative Humidity',
                 'column': headers[idx],
                 'average': avg_rh,
-                'compliant': percent_over < 10,
+                'compliant': percent_over < 10,  # or percent_over == 0, as you prefer
                 'percent_over': percent_over
             })
 
-# Example usage with test data
-if __name__ == "__main__":
-    # Create sample test data
-    test_df = pd.DataFrame({
-        'timestamp': ['2024-01-01', '2024-01-02', '2024-01-03'],
-        'temperature': [22.5, 23.1, 21.8],
-        'humidity': [55, 65, 45],
-        'other': ['a', 'b', 'c']
-    })
-    
-    test_headers = ['timestamp', 'temperature', 'humidity', 'other']
-    test_mapping = {'relativeHumidity': [2]}  # humidity column
-    
-    results = check_comfort_conditions(test_df, test_headers, test_mapping)
-
-    # Indoor Temperature
-    for idx in mapping.get('indoorTemps', []):
-        col = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
-        if not col.empty:
-            below_70 = (col < 70).sum()
-            above_75 = (col > 75).sum()
-            percent_outside = ((below_70 + above_75) / len(col)) * 100
-            avg_temp = col.mean()
+    # Check indoor temperature
+    for idx in mapping.get('indoorTemps', []):  # Use .get() for safety
+        temp_data = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
+        if len(temp_data) > 0:
+            below_70 = (temp_data < 70).sum()
+            above_75 = (temp_data > 75).sum()
+            percent_outside = ((below_70 + above_75) / len(temp_data)) * 100
+            avg_temp = temp_data.mean()
             results.append({
-                "type": "Indoor Temperature",
-                "column": headers[idx],
-                "average": avg_temp,
-                "percent_outside": percent_outside,
-                "compliant": percent_outside == 0
+                'type': 'Indoor Temperature',
+                'column': headers[idx],
+                'average': avg_temp,
+                'percent_outside': percent_outside,
+                'compliant': percent_outside == 0
             })
+    
     return results
 
 def analyze_hvac_data_enhanced(data, headers, mapping):
