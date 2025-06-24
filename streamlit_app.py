@@ -676,7 +676,7 @@ if uploaded_files:
         # Combined Analysis
         st.subheader("🔧 Combined HVAC Diagnostic Analysis")
         
-         if all_issues:
+        if all_issues:
             flat_issues = [issue for file_issues in all_issues for issue in file_issues]
             high_count = len([issue for issue in flat_issues if issue.get('severity') == 'high'])
             medium_count = len([issue for issue in flat_issues if issue.get('severity') == 'medium'])
