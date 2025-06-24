@@ -688,84 +688,40 @@ if uploaded_files:
         
         if len(pressure_cols) > 0 or len(temp_cols) > 0:
             st.subheader("📈 Combined System Performance Analysis")
-            
-            # Create time series if we have enough data points
-            if len(combined_df) > 1:
-                combined_df_indexed = combined_df.reset_index()
-                combined_df_indexed['data_point'] = range(len(combined_df_indexed))
-                
-                fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
-                
-                # Plot 1: Pressure data
-                if pressure_cols:
-                    for i, col in enumerate(pressure_cols[:3]):  # Limit to first 3 columns
-                        if col in combined_df.columns:
-                            clean_data = pd.to_numeric(combined_df[col], errors='coerce').dropna()
-                            if len(clean_data) > 0:
-                                ax1.plot(range(len(combined_df)), pd.to_numeric(combined_df[col], errors='coerce'), 
-                                        label=col, linewidth=2, marker='o', markersize=2)
-                    ax1.set_title("System Pressures", fontweight='bold')
-                    ax1.set_ylabel("Pressure (PSI)", fontweight='bold')
-                    ax1.legend()
-                    ax1.grid(True, alpha=0.3)
-                else:
-                    ax1.text(0.5, 0.5, 'No Pressure Data Available', ha='center', va='center', transform=ax1.transAxes)
-                    ax1.set_title("System Pressures", fontweight='bold')
-                
-                # Plot 2: Temperature data
-                if temp_cols:
-                    colors = ['red', 'orange', 'darkred', 'crimson']
-                    for i, col in enumerate(temp_cols[:4]):  # Limit to first 4 columns
-                        if col in combined_df.columns:
-                            clean_data = pd.to_numeric(combined_df[col], errors='coerce').dropna()
-                            if len(clean_data) > 0:
-                                ax2.plot(range(len(combined_df)), pd.to_numeric(combined_df[col], errors='coerce'), 
-                                        label=col, color=colors[i % len(colors)], linewidth=2, marker='o', markersize=2)
-                    ax2.set_title("System Temperatures", fontweight='bold')
-                    ax2.set_ylabel("Temperature (°F)", fontweight='bold')
-                    ax2.legend()
-                    ax2.grid(True, alpha=0.3)
-                else:
-                    ax2.text(0.5, 0.5, 'No Temperature Data Available', ha='center', va='center', transform=ax2.transAxes)
-                    ax2.set_title("System Temperatures", fontweight='bold')
-                
-                # Plot 3: Show data distribution
-                if len(numeric_cols) > 0:
-                    sample_col = numeric_cols[0]
-                    clean_data = pd.to_numeric(combined_df[sample_col], errors='coerce').dropna()
-                    if len(clean_data) > 0:
-                        ax3.hist(clean_data, bins=20, alpha=0.7, edgecolor='black')
-                        ax3.set_title(f"Distribution: {sample_col}", fontweight='bold')
-                        ax3.set_ylabel("Frequency", fontweight='bold')
-                        ax3.grid(True, alpha=0.3)
-                    else:
-                        ax3.text(0.5, 0.5, 'No Data Available', ha='center', va='center', transform=ax3.transAxes)
-                else:
-                    ax3.text(0.5, 0.5, 'No Numeric Data Available', ha='center', va='center', transform=ax3.transAxes)
-                    ax3.set_title("Data Distribution", fontweight='bold')
-                
-                # Plot 4: Summary statistics
-                if len(numeric_cols) > 0:
-                    # Show mean values for key columns
-                    plot_cols = (pressure_cols + temp_cols)[:5]  # First 5 relevant columns
-                    if plot_cols:
-                        means = [pd.to_numeric(combined_df[col], errors='coerce').mean() for col in plot_cols]
-                        ax4.bar(range(len(plot_cols)), means, alpha=0.7)
-                        ax4.set_title("Average Values", fontweight='bold')
-                        ax4.set_ylabel("Value", fontweight='bold')
-                        ax4.set_xticks(range(len(plot_cols)))
-                        ax4.set_xticklabels([col[:10] + '...' if len(col) > 10 else col for col in plot_cols], rotation=45)
-                        ax4.grid(True, alpha=0.3)
-                    else:
-                        ax4.text(0.5, 0.5, 'No Suitable Data', ha='center', va='center', transform=ax4.transAxes)
-                        ax4.set_title("Average Values", fontweight='bold')
-                else:
-                    ax4.text(0.5, 0.5, 'No Data Available', ha='center', va='center', transform=ax4.transAxes)
-                    ax4.set_title("Average Values", fontweight='bold')
-                
-                plt.suptitle(f"HVAC System Performance Analysis - {project_title}", fontsize=16, fontweight='bold')
-                plt.tight_layout()
-                st.pyplot(fig)
+
+            def plot_temperature_vs_time(df, mapping, headers, time_col):
+    plt.figure(figsize=(12, 6))
+    temp_cols = (
+        mapping['supplyAirTemps']
+        + mapping['indoorTemps']  # assuming 'space temp' is mapped here
+        + mapping.get('spaceDewpoint', [])
+        + mapping['outdoorAirTemps']
+        + mapping.get('outdoorAirDewpoint', [])
+        + mapping['suctionTemps']
+    )
+    for idx in temp_cols:
+        plt.plot(df[time_col], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx])
+    plt.xlabel('Time')
+    plt.ylabel('Temperature (°F)')
+    plt.title('Temperature vs. Time')
+    plt.legend()
+    plt.tight_layout()
+    st.pyplot(plt)
+
+def plot_pressure_vs_time(df, mapping, headers, time_col):
+    plt.figure(figsize=(12, 6))
+    pressure_cols = (
+        mapping['suctionPressures']
+        + mapping['dischargePressures']  # assuming both discharge pressures are mapped here
+    )
+    for idx in pressure_cols:
+        plt.plot(df[time_col], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx])
+    plt.xlabel('Time')
+    plt.ylabel('Pressure (PSI)')
+    plt.title('Pressure vs. Time')
+    plt.legend()
+    plt.tight_layout()
+    st.pyplot(plt)
     
             # Enhanced Download report as PDF
             st.subheader("📄 Generate Professional Report")
