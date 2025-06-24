@@ -577,9 +577,9 @@ uploaded_files = st.file_uploader(
     "Upload one or more CSV or Excel files",
     type=["csv", "xlsx", "xls"],
     accept_multiple_files=True,
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
-)
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+    )
 
 if uploaded_files:
     all_dataframes = []
