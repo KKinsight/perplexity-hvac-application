@@ -166,11 +166,11 @@ def analyze_hvac_data_enhanced(data, headers, mapping):
             avg_pressure = col_data.mean()
     # Check suction pressures
     for idx in mapping['suctionPressures']:
-        col_data = pd.to_numeric(df.iloc[:, i], errors='coerce').dropna()
+        col_data = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
         if len(col_data) > 0:
             if col_data.mean() > 200:
                 issues.append({
-                    'message': f'High suction pressure detected in {headers[i]}',
+                    'message': f'High suction pressure detected in {headers[idx]}',
                     'severity': 'high',
                     'explanation': 'High suction pressure may indicate system overcharge or restricted airflow',
                     'suggestions': ['Check refrigerant levels', 'Inspect air filters', 'Verify ductwork']
