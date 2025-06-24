@@ -114,69 +114,22 @@ def format_date_enhanced(date_val, time_val=None):
         return None
 
 def check_comfort_conditions(df, headers, mapping):
+    """Check indoor comfort conditions"""
     results = []
     
-    # Debug prints
-    print(f"DataFrame shape: {df.shape}")
-    print(f"Headers length: {len(headers)}")
-    print(f"Mapping keys: {mapping.keys()}")
-    print(f"Relative Humidity indices: {mapping.get('relativeHumidity', [])}")
-    
-    # Check if mapping contains the expected key
-    if 'relativeHumidity' not in mapping:
-        print("WARNING: 'relativeHumidity' key not found in mapping")
-        return results
-    
-    # Relative Humidity
-    rh_indices = mapping.get('relativeHumidity', [])
-    if not rh_indices:
-        print("WARNING: No indices found for relativeHumidity")
-        return results
-    
-    for idx in rh_indices:
-        print(f"Processing column index: {idx}")
-        
-        # Check if index is valid
-        if idx >= len(headers) or idx >= df.shape[1]:
-            print(f"ERROR: Index {idx} is out of bounds")
-            continue
-            
-        print(f"Column name: {headers[idx]}")
-        
-        # Get the column data
-        try:
-            col_data = df.iloc[:, idx]
-            print(f"Raw data sample: {col_data.head()}")
-            
-            col = pd.to_numeric(col_data, errors='coerce').dropna()
-            print(f"Numeric data length: {len(col)}")
-            print(f"Numeric data sample: {col.head()}")
-            
-        except Exception as e:
-            print(f"ERROR processing column {idx}: {e}")
-            continue
-        
-        if not col.empty:
-            over_60 = (col > 60).sum()
-            percent_over = (over_60 / len(col)) * 100
-            avg_rh = col.mean()
-            
-            print(f"Values over 60: {over_60}")
-            print(f"Percent over 60: {percent_over}")
-            print(f"Average: {avg_rh}")
-            
+    # Check relative humidity
+    for idx in mapping['relativeHumidity']:
+        rh_data = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
+        if len(rh_data) > 0:
+            avg_rh = rh_data.mean()
+            percent_over = (rh_data > 60).sum() / len(rh_data) * 100
             results.append({
-                "type": "Relative Humidity",
-                "column": headers[idx],
-                "average": avg_rh,
-                "percent_over": percent_over,
-                "compliant": percent_over == 0
+                'type': 'Relative Humidity',
+                'column': headers[idx],
+                'average': avg_rh,
+                'compliant': percent_over < 10,
+                'percent_over': percent_over
             })
-        else:
-            print(f"WARNING: Column {idx} is empty after numeric conversion")
-    
-    print(f"Final results: {results}")
-    return results
 
 # Example usage with test data
 if __name__ == "__main__":
@@ -225,21 +178,23 @@ def analyze_hvac_data_enhanced(data, headers, mapping):
         # Suction Pressure Analysis (Enhanced)
         if colIdx in mapping['suctionPressures']:
             avg_pressure = col_data.mean()
-            if avg_pressure < 60:  # Low suction pressure
+    # Check suction pressures
+    for idx in mapping['suctionPressures']:
+        col_data = pd.to_numeric(df.iloc[:, i], errors='coerce').dropna()
+        if len(col_data) > 0:
+            if col_data.mean() > 200:
                 issues.append({
-                    "severity": "high",
-                    "message": f"Low suction pressure detected in {header} (Avg: {avg_pressure:.1f} PSI)",
-                    "explanation": "Low suction pressure typically indicates refrigerant undercharge, restriction in liquid line, or evaporator issues.",
-                    "suggestions": ["Check for refrigerant leaks", "Verify proper refrigerant charge", "Inspect liquid line for restrictions", "Check evaporator coil condition"],
-                    "issue_type": "refrigerant_system"
+                    'message': f'High suction pressure detected in {headers[i]}',
+                    'severity': 'high',
+                    'explanation': 'High suction pressure may indicate system overcharge or restricted airflow',
+                    'suggestions': ['Check refrigerant levels', 'Inspect air filters', 'Verify ductwork']
                 })
-            elif avg_pressure > 90:  # High suction pressure
+            elif col_data.mean() < 50:
                 issues.append({
-                    "severity": "medium",
-                    "message": f"High suction pressure detected in {header} (Avg: {avg_pressure:.1f} PSI)",
-                    "explanation": "High suction pressure may indicate overcharge, compressor issues, or excessive heat load.",
-                    "suggestions": ["Check refrigerant charge level", "Inspect compressor operation", "Verify cooling load calculations", "Check for non-condensables"],
-                    "issue_type": "refrigerant_system"
+                    'message': f'Low suction pressure detected in {headers[idx]}',
+                    'severity': 'medium',
+                    'explanation': 'Low suction pressure may indicate refrigerant leak or expansion valve issues',
+                    'suggestions': ['Check for refrigerant leaks', 'Inspect expansion valve', 'Verify system charge']
                 })
         
         # Discharge Pressure Analysis (Enhanced)
@@ -328,6 +283,23 @@ def analyze_hvac_data_enhanced(data, headers, mapping):
                         "outlier_count": len(outliers),
                         "issue_type": "sensor_system"
                     })
+
+         # Check temperature differentials
+        if mapping['suctionTemps'] and mapping['supplyAirTemps']:
+            for suc_idx in mapping['suctionTemps']:
+                for sat_idx in mapping['supplyAirTemps']:
+                    suc_data = pd.to_numeric(df.iloc[:, suc_idx], errors='coerce').dropna()
+                    sat_data = pd.to_numeric(df.iloc[:, sat_idx], errors='coerce').dropna()
+                    
+                    if len(suc_data) > 0 and len(sat_data) > 0:
+                        temp_diff = abs(sat_data.mean() - suc_data.mean())
+                        if temp_diff < 15:
+                            issues.append({
+                                'message': f'Low temperature differential between {headers[suc_idx]} and {headers[sat_idx]}',
+                                'severity': 'medium',
+                                'explanation': 'Low temperature differential may indicate poor heat transfer or airflow issues',
+                                'suggestions': ['Check evaporator coil', 'Verify airflow rates', 'Inspect refrigerant levels']
+                            })
     
     return issues
 
@@ -603,6 +575,7 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 all_dataframes = []
+all_issues = []
 file_metadata = []
 
 def read_csv_with_encoding(file_obj):
@@ -618,66 +591,41 @@ def read_csv_with_encoding(file_obj):
     content = file_obj.read().decode('utf-8', errors='replace')
     return pd.read_csv(StringIO(content)), content
 
+# --- File Upload ---
+uploaded_files = st.file_uploader(
+    "Upload one or more CSV or Excel files",
+    type=['csv', 'xlsx', 'xls'],
+    accept_multiple_files=True
+)
+
 if uploaded_files:
+    all_dataframes = []
+    all_issues = []
+    
+    # Process each file
     for uploaded_file in uploaded_files:
-        if all_dataframes:
-            combined_df = pd.concat(all_dataframes, ignore_index=True)
-            
-        # Combine all issues into one list
-        combined_issues = []
-        for _, df in file_metadata:
-            headers = df.columns.tolist()
-            mapping = parse_headers_enhanced(headers)  # Your existing mapping logic
-            try:
-                if mapping['date'] is not None and mapping['time'] is not None:
-                    date_col = headers[mapping['date']]
-                    time_col = headers[mapping['time']]
-                    df['datetime'] = pd.to_datetime(df[date_col] + ' ' + df[time_col])
-                elif mapping['date'] is not None:
-                    df['datetime'] = pd.to_datetime(df[headers[mapping['date']]])
-                elif mapping['time'] is not None:
-                    df['datetime'] = pd.to_datetime(df[headers[mapping['time']]])
-            except Exception as e:
-                st.warning(f"⚠️ Could not parse datetime: {e}")
-                
-            issues = analyze_hvac_data_enhanced(df, headers, mapping)
-            combined_issues.extend(issues)
-
-            # Generate summary stats from combined_df
-            df_summary = combined_df.describe()
-
-            if 'suction_pressure' in combined_df.columns:
-                st.subheader("📈 Suction Pressure Trends Across All Files")
-                
-                chart = alt.Chart(combined_df).mark_line().encode(
-                    x=alt.X('datetime:T', title='Time', axis=alt.Axis(format='%I %p')),  # 👈 Format here
-                    y='suction_pressure',
-                    color='source_file'
-                ).interactive()
-                
-                st.altair_chart(chart, use_container_width=True)
-            st.subheader("📊 System-Wide Data Overview (All Files Combined)")
-            st.dataframe(combined_df.head())
         try:
             file_extension = uploaded_file.name.lower().split('.')[-1]
+            
             if file_extension in ['xlsx', 'xls']:
                 df = pd.read_excel(
                     uploaded_file,
                     engine='openpyxl' if file_extension == 'xlsx' else 'xlrd'
                 )
                 st.success(f"✅ Excel file '{uploaded_file.name}' successfully read")
-                content = None
             else:
                 df, content = read_csv_with_encoding(uploaded_file)
                 st.success(f"✅ CSV file '{uploaded_file.name}' successfully read")
-
-            df['source_file'] = uploaded_file.name  # Optional: tag source
+            
+            # Add source file identifier
+            df['source_file'] = uploaded_file.name
             all_dataframes.append(df)
             
+            # Analyze each file
             headers = df.columns.tolist()
             mapping = parse_headers_enhanced(headers)
             
-            # Show detected columns for each file
+            # Show detected columns
             st.subheader(f"🔍 Detected Columns in {uploaded_file.name}")
             if mapping['suctionPressures']:
                 st.write(f"**Suction Pressures:** {[headers[i] for i in mapping['suctionPressures']]}")
@@ -689,270 +637,153 @@ if uploaded_files:
                 st.write(f"**Supply Air Temps:** {[headers[i] for i in mapping['supplyAirTemps']]}")
             if mapping['outdoorAirTemps']:
                 st.write(f"**Outdoor Air Temps:** {[headers[i] for i in mapping['outdoorAirTemps']]}")
-            if mapping['date'] is not None:
-                st.write(f"**Date Column:** {headers[mapping['date']]}")
-            if mapping['time'] is not None:
-                st.write(f"**Time Column:** {headers[mapping['time']]}")
             
-            # Analyze and display issues for each file
+            # Analyze issues for this file
             issues = analyze_hvac_data_enhanced(df, headers, mapping)
-            if issues:
-                st.write("Detected Issues:")
-                for issue in issues:
-                    st.write(f"- {issue['message']}")
-            else:
-                st.write("No major issues detected.")
-
-            # --- Main App Logic ---
-            st.subheader("📊 Data Preview")
-            st.dataframe(df.head(10))
+            all_issues.extend(issues)
             
-            # Show basic statistics
+        except Exception as e:
+            st.error(f"Error processing file {uploaded_file.name}: {str(e)}")
+    
+    # Combine all dataframes
+    if all_dataframes:
+        combined_df = pd.concat(all_dataframes, ignore_index=True)
+        
+        st.subheader("📊 Combined Data Overview")
+        st.dataframe(combined_df.head(10))
+        
+        # Show basic statistics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Data Points", len(combined_df))
+        with col2:
+            st.metric("Number of Files", len(all_dataframes))
+        with col3:
+            numeric_cols = combined_df.select_dtypes(include=[np.number]).columns
+            st.metric("Numeric Parameters", len(numeric_cols))
+        
+        # Combined Analysis
+        st.subheader("🔧 Combined HVAC Diagnostic Analysis")
+        
+        if all_issues:
+            # Show summary counts
+            high_count = len([i for i in all_issues if i['severity'] == 'high'])
+            medium_count = len([i for i in all_issues if i['severity'] == 'medium'])
+            low_count = len([i for i in all_issues if i['severity'] == 'low'])
+            
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Total Data Points", len(df))
+                st.metric("🔴 High Priority", high_count)
             with col2:
-                st.metric("Date Range", f"{len(df.index)} readings")
+                st.metric("🟡 Medium Priority", medium_count)
             with col3:
-                numeric_cols = df.select_dtypes(include=[np.number]).columns
-                st.metric("Numeric Parameters", len(numeric_cols))
-
-            st.subheader("🔧 HVAC Diagnostic Analysis")
-            if issues:
-                # Show summary counts
-                high_count = len([i for i in issues if i['severity'] == 'high'])
-                medium_count = len([i for i in issues if i['severity'] == 'medium'])
-                low_count = len([i for i in issues if i['severity'] == 'low'])
+                st.metric("🔵 Low Priority", low_count)
+            
+            # Display all issues
+            for issue in all_issues:
+                if issue['severity'] == 'high':
+                    st.error(f"🔴 **{issue['message']}**")
+                elif issue['severity'] == 'medium':
+                    st.warning(f"🟡 **{issue['message']}**")
+                else:
+                    st.info(f"**{issue['message']}**")
                 
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("🔴 High Priority", high_count)
-                with col2:
-                    st.metric("🟡 Medium Priority", medium_count)  
-                with col3:
-                    st.metric("🔵 Low Priority", low_count)
-                
+                st.markdown(f"**Why this matters:** {issue['explanation']}")
+                st.markdown("**Recommended actions:**")
+                for s in issue['suggestions']:
+                    st.markdown(f"• {s}")
                 st.markdown("---")
-
-                # Comfort Results
-                comfort_results = check_comfort_conditions(df, headers, mapping)
-
-                st.markdown("## 🏠 Indoor Comfort Check")
-                if comfort_results:
-                    for result in comfort_results:
-                        if result["type"] == "Relative Humidity":
-                            st.write(f"**{result['column']}** (Avg: {result['average']:.1f}%) - "
-                                     f"{'✅ Within ideal range (≤60%)' if result['compliant'] else f'⚠️ {result['percent_over']:.1f}% of values above 60%'}")
-                        elif result["type"] == "Indoor Temperature":
-                            st.write(f"**{result['column']}** (Avg: {result['average']:.1f}°F) - "
-                                     f"{'✅ Within ideal range (70–75°F)' if result['compliant'] else f'⚠️ {result['percent_outside']:.1f}% of values outside 70–75°F'}")
+        else:
+            st.success("✅ No immediate HVAC issues detected in the combined data analysis.")
+        
+        # Create visualizations using the combined data
+        # Find numeric columns that likely represent HVAC parameters
+        numeric_cols = combined_df.select_dtypes(include=[np.number]).columns
+        
+        # Try to identify key columns by name patterns
+        pressure_cols = [col for col in numeric_cols if any(term in col.lower() for term in ['pressure', 'psi', 'sucpr', 'headpr'])]
+        temp_cols = [col for col in numeric_cols if any(term in col.lower() for term in ['temp', 'sat', 'oat', 'discharge'])]
+        
+        if len(pressure_cols) > 0 or len(temp_cols) > 0:
+            st.subheader("📈 Combined System Performance Analysis")
+            
+            # Create time series if we have enough data points
+            if len(combined_df) > 1:
+                combined_df_indexed = combined_df.reset_index()
+                combined_df_indexed['data_point'] = range(len(combined_df_indexed))
+                
+                fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+                
+                # Plot 1: Pressure data
+                if pressure_cols:
+                    for i, col in enumerate(pressure_cols[:3]):  # Limit to first 3 columns
+                        if col in combined_df.columns:
+                            clean_data = pd.to_numeric(combined_df[col], errors='coerce').dropna()
+                            if len(clean_data) > 0:
+                                ax1.plot(range(len(combined_df)), pd.to_numeric(combined_df[col], errors='coerce'), 
+                                        label=col, linewidth=2, marker='o', markersize=2)
+                    ax1.set_title("System Pressures", fontweight='bold')
+                    ax1.set_ylabel("Pressure (PSI)", fontweight='bold')
+                    ax1.legend()
+                    ax1.grid(True, alpha=0.3)
                 else:
-                    st.info("No relative humidity or indoor temperature columns detected in this file.")
+                    ax1.text(0.5, 0.5, 'No Pressure Data Available', ha='center', va='center', transform=ax1.transAxes)
+                    ax1.set_title("System Pressures", fontweight='bold')
                 
-                # Display issues
-                for issue in issues:
-                    if issue['severity'] == 'high':
-                        st.error(f"🔴 **{issue['message']}**")
-                    elif issue['severity'] == 'medium':
-                        st.warning(f"🟡 **{issue['message']}**")
-                    else:
-                        st.info(f"🔵 **{issue['message']}**")
-                    
-                    st.markdown(f"**Why this matters:** {issue['explanation']}")
-                    st.markdown("**Recommended actions:**")
-                    for s in issue['suggestions']:
-                        st.markdown(f"• {s}")
-                    if "outlier_count" in issue:
-                        st.markdown(f"**Affected readings:** {issue['outlier_count']}")
-                    st.markdown("---")
-            else:
-                st.success("✅ No immediate HVAC issues detected in the data analysis.")
-    
-          # Enhanced Time-series plot with multiple subplots
-            if mapping['date'] is not None:
-                # Create datetime column
-                if mapping['time'] is not None:
-                    df['__datetime__'] = df.apply(lambda row: format_date_enhanced(row.iloc[mapping['date']], row.iloc[mapping['time']]), axis=1)
+                # Plot 2: Temperature data
+                if temp_cols:
+                    colors = ['red', 'orange', 'darkred', 'crimson']
+                    for i, col in enumerate(temp_cols[:4]):  # Limit to first 4 columns
+                        if col in combined_df.columns:
+                            clean_data = pd.to_numeric(combined_df[col], errors='coerce').dropna()
+                            if len(clean_data) > 0:
+                                ax2.plot(range(len(combined_df)), pd.to_numeric(combined_df[col], errors='coerce'), 
+                                        label=col, color=colors[i % len(colors)], linewidth=2, marker='o', markersize=2)
+                    ax2.set_title("System Temperatures", fontweight='bold')
+                    ax2.set_ylabel("Temperature (°F)", fontweight='bold')
+                    ax2.legend()
+                    ax2.grid(True, alpha=0.3)
                 else:
-                    df['__datetime__'] = df.iloc[:, mapping['date']].apply(lambda x: format_date_enhanced(x))
+                    ax2.text(0.5, 0.5, 'No Temperature Data Available', ha='center', va='center', transform=ax2.transAxes)
+                    ax2.set_title("System Temperatures", fontweight='bold')
                 
-                df_plot = df[df['__datetime__'].notna()].copy()
-                
-                if len(df_plot) > 0:
-                    st.subheader("📈 Time-Series Analysis")
-                    
-                    # Create multiple plots for different parameter types
-                    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
-                    
-                    # Plot 1: System Pressures
-                    if mapping['suctionPressures'] or mapping['dischargePressures']:
-                        for idx in mapping['suctionPressures']:
-                            ax1.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='blue', linewidth=2, marker='o', markersize=2)
-                        for idx in mapping['dischargePressures']:
-                            ax1.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='navy', linewidth=2, marker='s', markersize=2)
-                        ax1.set_title("System Pressures", fontweight='bold')
-                        ax1.set_ylabel("Pressure (PSI)", fontweight='bold')
-                        ax1.legend()
-                        ax1.grid(True, alpha=0.3)
-                        ax1.tick_params(axis='x', rotation=45)
-                    else:
-                        ax1.text(0.5, 0.5, 'No Pressure Data Available', ha='center', va='center', transform=ax1.transAxes)
-                        ax1.set_title("System Pressures", fontweight='bold')
-                    
-                    # Plot 2: System Temperatures
-                    if mapping['suctionTemps'] or mapping['supplyAirTemps'] or mapping['dischargeTemps']:
-                        for idx in mapping['suctionTemps']:
-                            ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='red', linewidth=2, marker='o', markersize=2)
-                        for idx in mapping['supplyAirTemps']:
-                            ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='orange', linewidth=2, marker='s', markersize=2)
-                        for idx in mapping['dischargeTemps']:
-                            ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='darkred', linewidth=2, marker='^', markersize=2)
-                        ax2.set_title("System Temperatures", fontweight='bold')
-                        ax2.set_ylabel("Temperature (°F)", fontweight='bold')
-                        ax2.legend()
-                        ax2.grid(True, alpha=0.3)
-                        ax2.tick_params(axis='x', rotation=45)
-                    else:
-                        # Look for any temperature columns that weren't specifically categorized
-                        temp_found = False
-                        for idx, header in enumerate(headers):
-                            if 'temp' in header.lower():
-                                ax2.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                        label=f"{header}", color='red', linewidth=2, marker='o', markersize=2)
-                                temp_found = True
-                        
-                        if temp_found:
-                            ax2.set_title("System Temperatures", fontweight='bold')
-                            ax2.set_ylabel("Temperature (°F)", fontweight='bold')
-                            ax2.legend()
-                            ax2.grid(True, alpha=0.3)
-                            ax2.tick_params(axis='x', rotation=45)
-                        else:
-                            ax2.text(0.5, 0.5, 'No Temperature Data Available', ha='center', va='center', transform=ax2.transAxes)
-                            ax2.set_title("System Temperatures", fontweight='bold')
-                    
-                    # Plot 3: Outdoor Air Temperature
-                    if mapping['outdoorAirTemps']:
-                        for idx in mapping['outdoorAirTemps']:
-                            ax3.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='green', linewidth=2, marker='d', markersize=2)
-                        ax3.set_title("Outdoor Air Temperature", fontweight='bold')
-                        ax3.set_ylabel("Temperature (°F)", fontweight='bold')
-                        ax3.legend()
+                # Plot 3: Show data distribution
+                if len(numeric_cols) > 0:
+                    sample_col = numeric_cols[0]
+                    clean_data = pd.to_numeric(combined_df[sample_col], errors='coerce').dropna()
+                    if len(clean_data) > 0:
+                        ax3.hist(clean_data, bins=20, alpha=0.7, edgecolor='black')
+                        ax3.set_title(f"Distribution: {sample_col}", fontweight='bold')
+                        ax3.set_ylabel("Frequency", fontweight='bold')
                         ax3.grid(True, alpha=0.3)
-                        ax3.tick_params(axis='x', rotation=45)
                     else:
-                        ax3.text(0.5, 0.5, 'No Outdoor Air Temperature Data', ha='center', va='center', transform=ax3.transAxes)
-                        ax3.set_title("Outdoor Air Temperature", fontweight='bold')
-                    
-                    # Plot 4: Setpoints
-                    if mapping['coolingSetpoints'] or mapping['heatingSetpoints']:
-                        for idx in mapping['coolingSetpoints']:
-                            ax4.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='cyan', linewidth=2, marker='v', markersize=2)
-                        for idx in mapping['heatingSetpoints']:
-                            ax4.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='magenta', linewidth=2, marker='*', markersize=3)
-                        ax4.set_title("Temperature Setpoints", fontweight='bold')
-                        ax4.set_ylabel("Temperature (°F)", fontweight='bold')
-                        ax4.legend()
+                        ax3.text(0.5, 0.5, 'No Data Available', ha='center', va='center', transform=ax3.transAxes)
+                else:
+                    ax3.text(0.5, 0.5, 'No Numeric Data Available', ha='center', va='center', transform=ax3.transAxes)
+                    ax3.set_title("Data Distribution", fontweight='bold')
+                
+                # Plot 4: Summary statistics
+                if len(numeric_cols) > 0:
+                    # Show mean values for key columns
+                    plot_cols = (pressure_cols + temp_cols)[:5]  # First 5 relevant columns
+                    if plot_cols:
+                        means = [pd.to_numeric(combined_df[col], errors='coerce').mean() for col in plot_cols]
+                        ax4.bar(range(len(plot_cols)), means, alpha=0.7)
+                        ax4.set_title("Average Values", fontweight='bold')
+                        ax4.set_ylabel("Value", fontweight='bold')
+                        ax4.set_xticks(range(len(plot_cols)))
+                        ax4.set_xticklabels([col[:10] + '...' if len(col) > 10 else col for col in plot_cols], rotation=45)
                         ax4.grid(True, alpha=0.3)
-                        ax4.tick_params(axis='x', rotation=45)
                     else:
-                        ax4.text(0.5, 0.5, 'No Setpoint Data Available', ha='center', va='center', transform=ax4.transAxes)
-                        ax4.set_title("Temperature Setpoints", fontweight='bold')
-                    
-                    import matplotlib.dates as mdates
-                    
-                    for ax in [ax1, ax2, ax3, ax4]:
-                        ax.xaxis.set_major_formatter(mdates.DateFormatter('%I %p'))  # e.g., 12 AM, 4 PM
-                        ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))   # every 4 hours
-                        ax.tick_params(axis='x', rotation=45)
-                    
-                    plt.suptitle(f"HVAC System Performance Analysis - {project_title}", fontsize=16, fontweight='bold')
-                    plt.tight_layout()
-                    st.pyplot(fig)
-                    
-                    # Additional simplified overview plot
-                    st.subheader("📊 System Overview (Dual-Axis)")
-                    fig2, ax_temp = plt.subplots(figsize=(14, 8))
-                    ax_press = ax_temp.twinx()
-                    
-                    # Plot key temperatures on primary axis
-                    temp_plotted = False
-                    for idx in mapping['suctionTemps']:
-                        ax_temp.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='red', linewidth=2, marker='o', markersize=3)
-                        temp_plotted = True
-                    for idx in mapping['supplyAirTemps']:
-                        ax_temp.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                    label=f"{headers[idx]}", color='orange', linewidth=2, marker='s', markersize=3)
-                        temp_plotted = True
-                    
-                    # If no specific temperature data found, look for any temperature columns
-                    if not temp_plotted:
-                        for idx, header in enumerate(headers):
-                            if 'temp' in header.lower():
-                                ax_temp.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                            label=f"{header}", color='red', linewidth=2, marker='o', markersize=3)
-                                temp_plotted = True
-                    
-                    # Plot pressures on secondary axis
-                    for idx in mapping['suctionPressures']:
-                        ax_press.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                     label=f"{headers[idx]}", color='blue', linewidth=2, linestyle='--')
-                    for idx in mapping['dischargePressures']:
-                        ax_press.plot(df_plot['__datetime__'], pd.to_numeric(df_plot.iloc[:, idx], errors='coerce'), 
-                                     label=f"{headers[idx]}", color='navy', linewidth=2, linestyle='--')
-                    
-                    # Formatting
-                    ax_temp.set_ylabel("Temperature (°F)", color='red', fontsize=12, fontweight='bold')
-                    ax_press.set_ylabel("Pressure (PSI)", color='blue', fontsize=12, fontweight='bold')
-                    ax_temp.set_xlabel("Date/Time", fontsize=12, fontweight='bold')
-                    ax_temp.tick_params(axis='y', labelcolor='red')
-                    ax_press.tick_params(axis='y', labelcolor='blue')
-                    import matplotlib.dates as mdates
-                    ax_temp.xaxis.set_major_formatter(mdates.DateFormatter('%I %p'))
-                    ax_temp.xaxis.set_major_locator(mdates.HourLocator(interval=4))
-                    plt.xticks(rotation=45)
-                    
-                    # Combine legends
-                    lines1, labels1 = ax_temp.get_legend_handles_labels()
-                    lines2, labels2 = ax_press.get_legend_handles_labels()
-                    if lines1 or lines2:
-                        ax_temp.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
-                    
-                    ax_temp.grid(True, alpha=0.3)
-                    plt.title(f"HVAC System Performance Overview - {project_title}", fontsize=14, fontweight='bold')
-                    plt.xticks(rotation=45)
-                    plt.tight_layout()
-                    st.pyplot(fig2)
-    
-            # Generate relevant diagnostic reference based on detected issues
-            if issues:
-                st.subheader("Relevant Diagnostic Reference")
-                st.markdown("*Based on issues detected in your system data*")
+                        ax4.text(0.5, 0.5, 'No Suitable Data', ha='center', va='center', transform=ax4.transAxes)
+                        ax4.set_title("Average Values", fontweight='bold')
+                else:
+                    ax4.text(0.5, 0.5, 'No Data Available', ha='center', va='center', transform=ax4.transAxes)
+                    ax4.set_title("Average Values", fontweight='bold')
                 
-                diagnostic_ref = generate_diagnostic_reference(issues)
-                
-                for category, problems in diagnostic_ref.items():
-                    st.markdown(f"### 🔧 **{category}**")
-                    
-                    for problem_name, details in problems.items():
-                        with st.expander(problem_name):
-                            st.markdown(f"**Symptoms:** {details['symptoms']}")
-                            st.markdown(f"**Causes:** {details['causes']}")
-                            st.markdown("**Diagnostic Steps:**")
-                            for step in details['diagnostics']:
-                                st.markdown(f"• {step}")
-                            st.markdown("**Solutions:**")
-                            for solution in details['solutions']:
-                                st.markdown(f"• {solution}")
+                plt.suptitle(f"HVAC System Performance Analysis - {project_title}", fontsize=16, fontweight='bold')
+                plt.tight_layout()
+                st.pyplot(fig)
     
             # Enhanced Download report as PDF
             st.subheader("📄 Generate Professional Report")
