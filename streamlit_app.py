@@ -116,18 +116,20 @@ def check_comfort_conditions(df, headers, mapping):
     results = []
     
     # Check relative humidity
-    for idx in mapping.get('relativeHumidity', []):  # Use .get() for safety
-        rh_data = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
-        if len(rh_data) > 0:
-            avg_rh = rh_data.mean()
-            percent_over = (rh_data > 60).sum() / len(rh_data) * 100
-            results.append({
-                'type': 'Relative Humidity',
-                'column': headers[idx],
-                'average': avg_rh,
-                'compliant': percent_over < 10,  # or percent_over == 0, as you prefer
-                'percent_over': percent_over
-            })
+    comfort_results = check_comfort_conditions(df, headers, mapping)
+    st.markdown("## 🏠 Indoor Comfort Check")
+    if comfort_results:
+        for result in comfort_results:
+            if result["type"] == "Relative Humidity":
+                msg = ('✅ Within ideal range (≤60%)' if result['compliant'] 
+                       else f'⚠️ {result["percent_over"]:.1f}% of values above 60%')
+                st.write(f"**{result['column']}** (Avg: {result['average']:.1f}%) - {msg}")
+            elif result["type"] == "Indoor Temperature":
+                msg = ('✅ Within ideal range (70–75°F)' if result['compliant'] 
+                       else f'⚠️ {result["percent_outside"]:.1f}% of values outside 70–75°F')
+                st.write(f"**{result['column']}** (Avg: {result['average']:.1f}°F) - {msg}")
+    else:
+        st.info("No relative humidity or indoor temperature columns detected in this file.")
 
     # Check indoor temperature
     for idx in mapping.get('indoorTemps', []):  # Use .get() for safety
@@ -578,8 +580,9 @@ def read_csv_with_encoding(file_obj):
 # --- File Upload ---
 uploaded_files = st.file_uploader(
     "Upload one or more CSV or Excel files",
-    type=['csv', 'xlsx', 'xls'],
-    accept_multiple_files=True
+    type=["csv", "xlsx", "xls"],
+    accept_multiple_files=True,
+    key="file_uploader_main"  # <-- Add this
 )
 
 if uploaded_files:
