@@ -555,11 +555,6 @@ project_title = st.text_input("Enter Project Title", "HVAC Diagnostic Report")
 st.title(project_title)
 
 # --- File Upload ---
-uploaded_files = st.file_uploader(
-    "Upload one or more CSV or Excel files", 
-    type=['csv', 'xlsx', 'xls'],
-    accept_multiple_files=True
-)
 all_dataframes = []
 all_issues = []
 file_metadata = []
