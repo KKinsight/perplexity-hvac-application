@@ -719,23 +719,23 @@ if uploaded_files:
             st.subheader("📈 Combined System Performance Analysis")
 
             def plot_temperature_vs_time(df, mapping, headers, time_col):
-    plt.figure(figsize=(12, 6))
-    temp_cols = (
-        mapping['supplyAirTemps']
-        + mapping['indoorTemps']  # assuming 'space temp' is mapped here
-        + mapping.get('spaceDewpoint', [])
-        + mapping['outdoorAirTemps']
-        + mapping.get('outdoorAirDewpoint', [])
-        + mapping['suctionTemps']
-    )
-    for idx in temp_cols:
-        plt.plot(df[time_col], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx])
-    plt.xlabel('Time')
-    plt.ylabel('Temperature (°F)')
-    plt.title('Temperature vs. Time')
-    plt.legend()
-    plt.tight_layout()
-    st.pyplot(plt)
+                plt.figure(figsize=(12, 6))
+                temp_cols = (
+                    mapping['supplyAirTemps']
+                    + mapping['indoorTemps']  # assuming 'space temp' is mapped here
+                    + mapping.get('spaceDewpoint', [])
+                    + mapping['outdoorAirTemps']
+                    + mapping.get('outdoorAirDewpoint', [])
+                    + mapping['suctionTemps']
+                )
+                for idx in temp_cols:
+                    plt.plot(df[time_col], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx])
+                    plt.xlabel('Time')
+                    plt.ylabel('Temperature (°F)')
+                    plt.title('Temperature vs. Time')
+                    plt.legend()
+                    plt.tight_layout()
+                    st.pyplot(plt)
 
 def plot_pressure_vs_time(df, mapping, headers, time_col):
     plt.figure(figsize=(12, 6))
