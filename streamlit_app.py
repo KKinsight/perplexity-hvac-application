@@ -737,20 +737,20 @@ if uploaded_files:
                     plt.tight_layout()
                     st.pyplot(plt)
 
-def plot_pressure_vs_time(df, mapping, headers, time_col):
-    plt.figure(figsize=(12, 6))
-    pressure_cols = (
-        mapping['suctionPressures']
-        + mapping['dischargePressures']  # assuming both discharge pressures are mapped here
-    )
-    for idx in pressure_cols:
-        plt.plot(df[time_col], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx])
-    plt.xlabel('Time')
-    plt.ylabel('Pressure (PSI)')
-    plt.title('Pressure vs. Time')
-    plt.legend()
-    plt.tight_layout()
-    st.pyplot(plt)
+    def plot_pressure_vs_time(df, mapping, headers, time_col):
+        plt.figure(figsize=(12, 6))
+        pressure_cols = (
+            mapping['suctionPressures']
+            + mapping['dischargePressures']  # assuming both discharge pressures are mapped here
+        )
+        for idx in pressure_cols:
+            plt.plot(df[time_col], pd.to_numeric(df.iloc[:, idx], errors='coerce'), label=headers[idx])
+        plt.xlabel('Time')
+        plt.ylabel('Pressure (PSI)')
+        plt.title('Pressure vs. Time')
+        plt.legend()
+        plt.tight_layout()
+        st.pyplot(plt)
     
         # Enhanced Download report as PDF
     from datetime import datetime
