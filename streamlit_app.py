@@ -31,7 +31,7 @@ def parse_headers_enhanced(headers):
         'time': None
     }
     
-   for i, h in enumerate(headers):
+    for i, h in enumerate(headers):
         h_clean = str(h).strip()
         lower = h_clean.lower()
        
@@ -41,8 +41,6 @@ def parse_headers_enhanced(headers):
         # Indoor Temperature detection
         if any(keyword in lower for keyword in ['indoor temp', 'indoor temperature', 'room temp', 'space temp']):
             mapping['indoorTemps'].append(i)
-        # ... rest of your logic ...
-    return mapping
         
         # Date and Time detection
         if any(keyword in lower for keyword in ['date']) and mapping['date'] is None:
