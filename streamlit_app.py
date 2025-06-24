@@ -78,7 +78,7 @@ def parse_headers_enhanced(headers):
             mapping['heatingSetpoints'].append(i)
 
         # Humidity
-        elif 'rh' in header_lower or 'humidity' in header_lower:
+        elif 'rh' in lower or 'humidity' in lower:
             mapping['relativeHumidity'].append(i)
     
     return mapping
@@ -577,7 +577,8 @@ uploaded_files = st.file_uploader(
     "Upload one or more CSV or Excel files",
     type=["csv", "xlsx", "xls"],
     accept_multiple_files=True,
-    key="file_uploader_main"  # <-- Add this
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
 )
 
 if uploaded_files:
@@ -732,6 +733,7 @@ def plot_pressure_vs_time(df, mapping, headers, time_col):
                 if st.button("📄 Generate PDF Report", type="primary"):
                     try:
                         # Generate PDF
+                        issues = analyze_hvac_data_enhanced(df, headers, mapping)
                         pdf_buffer = generate_pdf_report(project_title, logo_file, issues, df)
                         
                         from datetime import datetime
