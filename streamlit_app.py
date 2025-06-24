@@ -878,10 +878,6 @@ if uploaded_files:
             
             with col2:
                 st.info("📋 **PDF Report Includes:**\n- Executive Summary\n- Detailed Issue Analysis\n- Recommendations\n- Data Statistics\n- Professional Formatting")
-
-        except Exception as e:
-            st.error(f"Error processing file: {str(e)}")
-            st.info("Please make sure your CSV files are properly formatted and contain valid data.")
     
 else:
     st.info("👆 Please upload CSV or XLSX files to begin HVAC data analysis")
