@@ -159,7 +159,7 @@ if __name__ == "__main__":
                 "percent_outside": percent_outside,
                 "compliant": percent_outside == 0
             })
-    return results
+        return results
 
 def analyze_hvac_data_enhanced(data, headers, mapping):
     """Enhanced HVAC analysis with improved detection logic"""
