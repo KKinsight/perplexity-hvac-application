@@ -752,8 +752,8 @@ def plot_pressure_vs_time(df, mapping, headers, time_col):
     plt.tight_layout()
     st.pyplot(plt)
     
-            # Enhanced Download report as PDF
-            st.subheader("📄 Generate Professional Report")
+        # Enhanced Download report as PDF
+        st.subheader("📄 Generate Professional Report")
             
             col1, col2 = st.columns(2)
             
