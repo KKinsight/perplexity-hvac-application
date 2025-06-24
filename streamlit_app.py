@@ -34,6 +34,7 @@ def parse_headers_enhanced(headers):
    for i, h in enumerate(headers):
         h_clean = str(h).strip()
         lower = h_clean.lower()
+       
         # Relative Humidity detection
         if any(keyword in lower for keyword in ['rel hum', 'rel. hum', 'relative humidity', 'rh']):
             mapping['relativeHumidity'].append(i)
@@ -77,29 +78,93 @@ def parse_headers_enhanced(headers):
         
         elif any(keyword in lower for keyword in ['hsp', 'heat', 'heating']) and ('sp' in lower or 'setpoint' in lower):
             mapping['heatingSetpoints'].append(i)
+
+        # Humidity
+        elif 'rh' in header_lower or 'humidity' in header_lower:
+            mapping['relativeHumidity'].append(i)
     
     return mapping
 
-def format_date_enhanced(date_str, time_str=None):
-    """Enhanced date formatting that can handle date and time separately"""
+def format_date_enhanced(date_val, time_val=None):
+    """Enhanced date formatting function"""
     try:
-        if time_str is not None:
-            combined = f"{date_str} {time_str}"
-            return pd.to_datetime(combined, errors='coerce')
+        if pd.isna(date_val):
+            return None
+            
+        # Handle different date formats
+        if isinstance(date_val, str):
+            # Try parsing common date formats
+            for fmt in ['%d-%b', '%m/%d/%Y', '%Y-%m-%d', '%m-%d-%Y']:
+                try:
+                    if time_val is not None and not pd.isna(time_val):
+                        datetime_str = f"{date_val} {time_val}"
+                        return pd.to_datetime(datetime_str, format=f"{fmt} %H:%M")
+                    else:
+                        return pd.to_datetime(date_val, format=fmt)
+                except:
+                    continue
+        
+        # If direct conversion works
+        if time_val is not None and not pd.isna(time_val):
+            return pd.to_datetime(f"{date_val} {time_val}")
         else:
-            return pd.to_datetime(date_str, errors='coerce')
+            return pd.to_datetime(date_val)
+            
     except:
-        return pd.NaT
+        return None
 
 def check_comfort_conditions(df, headers, mapping):
     results = []
+    
+    # Debug prints
+    print(f"DataFrame shape: {df.shape}")
+    print(f"Headers length: {len(headers)}")
+    print(f"Mapping keys: {mapping.keys()}")
+    print(f"Relative Humidity indices: {mapping.get('relativeHumidity', [])}")
+    
+    # Check if mapping contains the expected key
+    if 'relativeHumidity' not in mapping:
+        print("WARNING: 'relativeHumidity' key not found in mapping")
+        return results
+    
     # Relative Humidity
-    for idx in mapping.get('relativeHumidity', []):
-        col = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
+    rh_indices = mapping.get('relativeHumidity', [])
+    if not rh_indices:
+        print("WARNING: No indices found for relativeHumidity")
+        return results
+    
+    for idx in rh_indices:
+        print(f"Processing column index: {idx}")
+        
+        # Check if index is valid
+        if idx >= len(headers) or idx >= df.shape[1]:
+            print(f"ERROR: Index {idx} is out of bounds")
+            continue
+            
+        print(f"Column name: {headers[idx]}")
+        
+        # Get the column data
+        try:
+            col_data = df.iloc[:, idx]
+            print(f"Raw data sample: {col_data.head()}")
+            
+            col = pd.to_numeric(col_data, errors='coerce').dropna()
+            print(f"Numeric data length: {len(col)}")
+            print(f"Numeric data sample: {col.head()}")
+            
+        except Exception as e:
+            print(f"ERROR processing column {idx}: {e}")
+            continue
+        
         if not col.empty:
             over_60 = (col > 60).sum()
             percent_over = (over_60 / len(col)) * 100
             avg_rh = col.mean()
+            
+            print(f"Values over 60: {over_60}")
+            print(f"Percent over 60: {percent_over}")
+            print(f"Average: {avg_rh}")
+            
             results.append({
                 "type": "Relative Humidity",
                 "column": headers[idx],
@@ -107,6 +172,26 @@ def check_comfort_conditions(df, headers, mapping):
                 "percent_over": percent_over,
                 "compliant": percent_over == 0
             })
+        else:
+            print(f"WARNING: Column {idx} is empty after numeric conversion")
+    
+    print(f"Final results: {results}")
+    return results
+
+# Example usage with test data
+if __name__ == "__main__":
+    # Create sample test data
+    test_df = pd.DataFrame({
+        'timestamp': ['2024-01-01', '2024-01-02', '2024-01-03'],
+        'temperature': [22.5, 23.1, 21.8],
+        'humidity': [55, 65, 45],
+        'other': ['a', 'b', 'c']
+    })
+    
+    test_headers = ['timestamp', 'temperature', 'humidity', 'other']
+    test_mapping = {'relativeHumidity': [2]}  # humidity column
+    
+    results = check_comfort_conditions(test_df, test_headers, test_mapping)
 
     # Indoor Temperature
     for idx in mapping.get('indoorTemps', []):
