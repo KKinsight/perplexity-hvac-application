@@ -753,102 +753,108 @@ def plot_pressure_vs_time(df, mapping, headers, time_col):
     st.pyplot(plt)
     
         # Enhanced Download report as PDF
-        st.subheader("📄 Generate Professional Report")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("📄 Generate PDF Report", type="primary"):
-                    try:
-                        # Generate PDF
-                        issues = analyze_hvac_data_enhanced(df, headers, mapping)
-                        pdf_buffer = generate_pdf_report(project_title, logo_file, issues, df)
-                        
-                        from datetime import datetime
+    from datetime import datetime
 
-                        report_text = generate_report(combined_df)  # Define this helper function
-                        
-                        st.download_button(
-                            label="⬇️ Download Combined Report",
-                            data=report_text,
-                            file_name=f"HVAC_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                            mime="text/plain"
-                        )
+    st.subheader("📄 Generate Professional Report")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("📄 Generate PDF Report", type="primary"):
+            try:
+                issues = analyze_hvac_data_enhanced(df, headers, mapping)
+                pdf_buffer = generate_pdf_report(
+                    project_title="HVAC Diagnostic Report",
+                    logo_file=None,
+                    issues=issues,
+                    df=df
+                )
+                st.download_button(
+                    label="Download PDF Report",
+                    data=pdf_buffer,
+                    file_name="hvac_report.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(f"Error generating PDF: {str(e)}")
+                st.info("PDF generation requires additional libraries. Falling back to text report.")
     
-                        st.success("✅ PDF report generated successfully!")
-                        
-                    except Exception as e:
-                        st.error(f"Error generating PDF: {str(e)}")
-                        st.info("PDF generation requires additional libraries. Falling back to text report.")
-                        
-                        # Fallback to text report
-                        report_lines = [
-                            f"{project_title}",
-                            "="*len(project_title),
-                            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                            "",
-                            "HVAC DIAGNOSTIC ANALYSIS REPORT",
-                            "="*50,
-                            "",
-                            "SYSTEM DATA ANALYSIS FINDINGS:",
-                            ""
-                        ]
-                        
-                        if issues:
-                            high_issues = [i for i in issues if i['severity'] == 'high']
-                            medium_issues = [i for i in issues if i['severity'] == 'medium']
-                            low_issues = [i for i in issues if i['severity'] == 'low']
-                            
-                            if high_issues:
-                                report_lines.extend(["HIGH PRIORITY ISSUES:", "-"*20])
-                                for issue in high_issues:
-                                    report_lines.extend([
-                                        f"ISSUE: {issue['message']}",
-                                        f"EXPLANATION: {issue['explanation']}",
-                                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
-                                        ""
-                                    ])
-                            
-                            if medium_issues:
-                                report_lines.extend(["MEDIUM PRIORITY ISSUES:", "-"*22])
-                                for issue in medium_issues:
-                                    report_lines.extend([
-                                        f"ISSUE: {issue['message']}",
-                                        f"EXPLANATION: {issue['explanation']}",
-                                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
-                                        ""
-                                    ])
-                            
-                            if low_issues:
-                                report_lines.extend(["LOW PRIORITY ISSUES:", "-"*19])
-                                for issue in low_issues:
-                                    report_lines.extend([
-                                        f"ISSUE: {issue['message']}",
-                                        f"EXPLANATION: {issue['explanation']}",
-                                        f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
-                                        ""
-                                    ])
-                        else:
-                            report_lines.append("✅ No immediate HVAC issues detected in data analysis.")
-                        
-                        report_lines.extend([
-                            "",
-                            "="*50,
-                            f"Report generated by {project_title} Analysis System",
-                            f"For technical support, please contact your HVAC service provider."
-                        ])
-                        
-                        report = "\n".join(report_lines)
-                        st.download_button(
-                            "📄 Download Text Report (Fallback)", 
-                            report, 
-                            file_name=f"{project_title.replace(' ', '_')}_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                            mime="text/plain"
-                        )
-            
-            with col2:
-                st.info("📋 **PDF Report Includes:**\n- Executive Summary\n- Detailed Issue Analysis\n- Recommendations\n- Data Statistics\n- Professional Formatting")
+                # Fallback to text report
+                project_title = "HVAC Diagnostic Report"
+                report_lines = [
+                    f"{project_title}",
+                    "="*len(project_title),
+                    f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    "",
+                    "HVAC DIAGNOSTIC ANALYSIS REPORT",
+                    "="*50,
+                    "",
+                    "SYSTEM DATA ANALYSIS FINDINGS:",
+                    ""
+                ]
     
+                if issues:
+                    high_issues = [i for i in issues if i.get('severity') == 'high']
+                    medium_issues = [i for i in issues if i.get('severity') == 'medium']
+                    low_issues = [i for i in issues if i.get('severity') == 'low']
+    
+                    if high_issues:
+                        report_lines.extend(["HIGH PRIORITY ISSUES:", "-"*20])
+                        for issue in high_issues:
+                            report_lines.extend([
+                                f"ISSUE: {issue['message']}",
+                                f"EXPLANATION: {issue['explanation']}",
+                                f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                                ""
+                            ])
+    
+                    if medium_issues:
+                        report_lines.extend(["MEDIUM PRIORITY ISSUES:", "-"*22])
+                        for issue in medium_issues:
+                            report_lines.extend([
+                                f"ISSUE: {issue['message']}",
+                                f"EXPLANATION: {issue['explanation']}",
+                                f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                                ""
+                            ])
+    
+                    if low_issues:
+                        report_lines.extend(["LOW PRIORITY ISSUES:", "-"*19])
+                        for issue in low_issues:
+                            report_lines.extend([
+                                f"ISSUE: {issue['message']}",
+                                f"EXPLANATION: {issue['explanation']}",
+                                f"RECOMMENDATIONS: {'; '.join(issue['suggestions'])}",
+                                ""
+                            ])
+                else:
+                    report_lines.append("✅ No immediate HVAC issues detected in data analysis.")
+    
+                report_lines.extend([
+                    "",
+                    "="*50,
+                    f"Report generated by {project_title} Analysis System",
+                    f"For technical support, please contact your HVAC service provider."
+                ])
+    
+                report = "\n".join(report_lines)
+                st.download_button(
+                    "📄 Download Text Report (Fallback)",
+                    report,
+                    file_name=f"{project_title.replace(' ', '_')}_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                    mime="text/plain"
+                )
+    
+    with col2:
+        st.info(
+            "📋 **PDF Report Includes:**\n"
+            "- Executive Summary\n"
+            "- Detailed Issue Analysis\n"
+            "- Recommendations\n"
+            "- Data Statistics\n"
+            "- Professional Formatting"
+        )
+        
 else:
     st.info("👆 Please upload CSV or XLSX files to begin HVAC data analysis")
     st.markdown("### 📋 **Expected Data Format**")
