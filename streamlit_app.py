@@ -677,10 +677,12 @@ if uploaded_files:
         st.subheader("🔧 Combined HVAC Diagnostic Analysis")
         
         if all_issues:
-            # Show summary counts
-            high_count = len([i for i in all_issues if i['severity'] == 'high'])
-            medium_count = len([i for i in all_issues if i['severity'] == 'medium'])
-            low_count = len([i for i in all_issues if i['severity'] == 'low'])
+            # Flatten all_issues (which is a list of lists) into one list of issue dicts
+            flat_issues = [issue for file_issues in all_issues for issue in file_issues]
+            
+            high_count = len([issue for issue in flat_issues if issue.get('severity') == 'high'])
+            medium_count = len([issue for issue in flat_issues if issue.get('severity') == 'medium'])
+            low_count = len([issue for issue in flat_issues if issue.get('severity') == 'low'])
             
             col1, col2, col3 = st.columns(3)
             with col1:
