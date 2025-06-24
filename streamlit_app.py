@@ -554,11 +554,6 @@ if logo_file:
 project_title = st.text_input("Enter Project Title", "HVAC Diagnostic Report")
 st.title(project_title)
 
-# --- File Upload ---
-all_dataframes = []
-all_issues = []
-file_metadata = []
-
 def read_csv_with_encoding(file_obj):
     encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-16']
     for encoding in encodings_to_try:
@@ -576,10 +571,19 @@ def read_csv_with_encoding(file_obj):
 uploaded_files = st.file_uploader(
     "Upload one or more CSV or Excel files",
     type=["csv", "xlsx", "xls"],
-    accept_multiple_files=True,
-    if uploaded_file is not None:
+    accept_multiple_files=True
+)
+
+def read_csv_with_encoding(uploaded_file):
+    # Try reading with utf-8, fallback to latin1 if needed
+    try:
         df = pd.read_csv(uploaded_file)
-    )
+        content = uploaded_file.getvalue()
+    except UnicodeDecodeError:
+        uploaded_file.seek(0)
+        df = pd.read_csv(uploaded_file, encoding='latin1')
+        content = uploaded_file.getvalue()
+    return df, content
 
 if uploaded_files:
     all_dataframes = []
@@ -599,6 +603,30 @@ if uploaded_files:
             else:
                 df, content = read_csv_with_encoding(uploaded_file)
                 st.success(f"✅ CSV file '{uploaded_file.name}' successfully read")
+            
+            # Now you can process df as needed:
+            headers = list(df.columns)
+            mapping = parse_headers_enhanced(headers)
+            
+            # Example: Show first few rows
+            st.write(f"**Preview of {uploaded_file.name}:**")
+            st.dataframe(df.head())
+            
+            # Example: Analyze and collect issues for this file
+            issues = analyze_hvac_data_enhanced(df, headers, mapping)
+            all_dataframes.append(df)
+            all_issues.append(issues)
+            
+            # Example: Show issues
+            if issues:
+                st.error(f"Issues detected in {uploaded_file.name}:")
+                for issue in issues:
+                    st.write(f"- {issue['message']}")
+            else:
+                st.success(f"No major issues found in {uploaded_file.name}.")
+            
+        except Exception as e:
+            st.error(f"Error processing file {uploaded_file.name}: {e}")
             
             # Add source file identifier
             df['source_file'] = uploaded_file.name
