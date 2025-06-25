@@ -575,13 +575,13 @@ uploaded_files = st.file_uploader(
 )
 
 def read_csv_with_encoding(uploaded_file):
-    # Try reading with utf-8, fallback to latin1 if needed
+    # Try reading with utf-8, fallback to latin-1 if needed
     try:
         df = pd.read_csv(uploaded_file)
         content = uploaded_file.getvalue()
     except UnicodeDecodeError:
         uploaded_file.seek(0)
-        df = pd.read_csv(uploaded_file, encoding='latin1')
+        df = pd.read_csv(uploaded_file, encoding='latin-1')
         content = uploaded_file.getvalue()
     return df, content
 
