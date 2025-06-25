@@ -846,15 +846,15 @@ if uploaded_files:
                     mime="text/plain"
                 )
     
-    with col2:
-        st.info(
-            "📋 **PDF Report Includes:**\n"
-            "- Executive Summary\n"
-            "- Detailed Issue Analysis\n"
-            "- Recommendations\n"
-            "- Data Statistics\n"
-            "- Professional Formatting"
-        )
+        with col2:
+            st.info(
+                "📋 **PDF Report Includes:**\n"
+                "- Executive Summary\n"
+                "- Detailed Issue Analysis\n"
+                "- Recommendations\n"
+                "- Data Statistics\n"
+                "- Professional Formatting"
+            )
         
 else:
     st.info("👆 Please upload CSV or XLSX files to begin HVAC data analysis")
