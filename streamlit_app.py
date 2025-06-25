@@ -856,15 +856,15 @@ if uploaded_files:
                 "- Professional Formatting"
             )
         
-else:
-    st.info("👆 Please upload CSV or XLSX files to begin HVAC data analysis")
-    st.markdown("### 📋 **Expected Data Format**")
-    st.markdown("""
-    Your CSV and XLSX files should contain columns with names that include:
-    - **Date/Time** information (e.g., 'Date', 'Timestamp')
-    - **Suction Pressure** data (e.g., 'Suction Pressure', 'Suction PSI')
-    - **Discharge Pressure** data (e.g., 'Discharge Pressure', 'Head Pressure')
-    - **Temperature** readings (e.g., 'Suction Temp', 'Supply Air Temp', 'Discharge Temp')
-    
-    The system will automatically detect and analyze these parameters based on column names.
-    """)
+    else:
+        st.info("👆 Please upload CSV or XLSX files to begin HVAC data analysis")
+        st.markdown("### 📋 **Expected Data Format**")
+        st.markdown("""
+        Your CSV and XLSX files should contain columns with names that include:
+        - **Date/Time** information (e.g., 'Date', 'Timestamp')
+        - **Suction Pressure** data (e.g., 'Suction Pressure', 'Suction PSI')
+        - **Discharge Pressure** data (e.g., 'Discharge Pressure', 'Head Pressure')
+        - **Temperature** readings (e.g., 'Suction Temp', 'Supply Air Temp', 'Discharge Temp')
+        
+        The system will automatically detect and analyze these parameters based on column names.
+        """)
