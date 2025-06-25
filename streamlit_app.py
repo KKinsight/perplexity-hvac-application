@@ -439,7 +439,8 @@ def generate_pdf_report(project_title, logo_file, issues, df_summary=None):
     
     # Detailed Findings
     story.append(Paragraph("Detailed Findings", heading_style))
-    
+    df.columns = df.columns.str.strip().str.lower()
+
     if issues:
         # Group issues by severity
         high_issues = [i for i in issues if i['severity'] == 'high']
