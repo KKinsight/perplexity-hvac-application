@@ -318,7 +318,7 @@ def check_comfort_conditions(df, headers, mapping):
     results = []
 
     # Check relative humidity
-    for idx in mapping.get('relativeHumidity', []):
+    for idx in mapping.get('indoorrh', []):
         humidity_data = pd.to_numeric(df.iloc[:, idx], errors='coerce').dropna()
         if len(humidity_data) > 0:
             above_60 = (humidity_data > 60).sum()
@@ -326,7 +326,7 @@ def check_comfort_conditions(df, headers, mapping):
             avg_humidity = humidity_data.mean()
 
             results.append({
-                'type': 'Outdoor Relative Humidity',
+                'type': 'Indoor Relative Humidity',
                 'column': headers[idx],
                 'average': avg_humidity,
                 'percent_over': percent_over,
