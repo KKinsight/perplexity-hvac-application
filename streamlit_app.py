@@ -601,11 +601,10 @@ def generate_pdf_report(project_title, logo_file, issues, df_summary=None):
                 ]))
                 story.append(table)
 
-
-    except ValueError:
-        story.append(Paragraph("Invalid data encountered while generating summary statistics.", normal_style))
-    except Exception as e:
-        story.append(Paragraph(f"An error occurred: {str(e)}", normal_style))
+        except ValueError:
+            story.append(Paragraph("Invalid data encountered while generating summary statistics.", normal_style))
+        except Exception as e:
+            story.append(Paragraph(f"An error occurred: {str(e)}", normal_style))
 
     # Footer
     story.append(Spacer(1, 30))
